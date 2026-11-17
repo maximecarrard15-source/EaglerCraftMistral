@@ -1,0 +1,147 @@
+'use strict';
+(function (global) {
+  const CHUNK = 16;
+  const WORLD_H = 64;
+  const WATER_LEVEL = 22;
+
+  const AIR = 0, GRASS = 1, DIRT = 2, STONE = 3, SAND = 4, LOG = 5, LEAVES = 6,
+        WATER = 7, PLANKS = 8, COBBLE = 9, GLASS = 10, BRICK = 11, BEDROCK = 12,
+        SNOW = 13, GRAVEL = 14;
+
+  const BLOCKS = {
+    [GRASS]:   { name: 'Herbe',          top: 0,  bottom: 2,  side: 1,  opaque: true,  solid: true },
+    [DIRT]:    { name: 'Terre',          top: 2,  bottom: 2,  side: 2,  opaque: true,  solid: true },
+    [STONE]:   { name: 'Pierre',         top: 3,  bottom: 3,  side: 3,  opaque: true,  solid: true },
+    [SAND]:    { name: 'Sable',          top: 4,  bottom: 4,  side: 4,  opaque: true,  solid: true },
+    [LOG]:     { name: 'Bois',           top: 6,  bottom: 6,  side: 5,  opaque: true,  solid: true },
+    [LEAVES]:  { name: 'Feuilles',       top: 7,  bottom: 7,  side: 7,  opaque: true,  solid: true },
+    [WATER]:   { name: 'Eau',            top: 8,  bottom: 8,  side: 8,  opaque: false, solid: false, fluid: true },
+    [PLANKS]:  { name: 'Planches',       top: 9,  bottom: 9,  side: 9,  opaque: true,  solid: true },
+    [COBBLE]:  { name: 'Pierre taillée', top: 10, bottom: 10, side: 10, opaque: true,  solid: true },
+    [GLASS]:   { name: 'Verre',          top: 11, bottom: 11, side: 11, opaque: false, solid: true },
+    [BRICK]:   { name: 'Brique',         top: 12, bottom: 12, side: 12, opaque: true,  solid: true },
+    [BEDROCK]: { name: 'Bedrock',        top: 13, bottom: 13, side: 13, opaque: true,  solid: true, unbreakable: true },
+    [SNOW]:    { name: 'Neige',          top: 14, bottom: 14, side: 14, opaque: true,  solid: true },
+    [GRAVEL]:  { name: 'Gravier',        top: 15, bottom: 15, side: 15, opaque: true,  solid: true }
+  };
+
+  let SEED = 1337;
+  function setSeed(s) { SEED = s | 0; }
+  function getSeed() { return SEED; }
+
+  function hash2(x, y, s) {
+    let h = (s | 0) ^ Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  }
+
+  function smooth(t) { return t * t * (3 - 2 * t); }
+
+  function noise2(x, y, s) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const xf = x - xi, yf = y - yi;
+    const a = hash2(xi, yi, s), b = hash2(xi + 1, yi, s);
+    const c = hash2(xi, yi + 1, s), d = hash2(xi + 1, yi + 1, s);
+    const u = smooth(xf), v = smooth(yf);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  }
+
+  function fbm(x, y, s, octaves) {
+    let amp = 1, freq = 1, sum = 0, norm = 0;
+    for (let i = 0; i < octaves; i++) {
+      sum += amp * noise2(x * freq, y * freq, (s + i * 1013) | 0);
+      norm += amp;
+      amp *= 0.5;
+      freq *= 2;
+    }
+    return sum / norm;
+  }
+
+  function terrainHeight(wx, wz) {
+    const e = fbm(wx * 0.0075, wz * 0.0075, SEED, 4);
+    const d = fbm(wx * 0.045, wz * 0.045, (SEED ^ 0x9e3779) | 0, 2);
+    const h = 12 + Math.pow(e, 1.6) * 40 + d * 5;
+    return Math.max(2, Math.min(WORLD_H - 12, Math.floor(h)));
+  }
+
+  function surfaceBlock(h) {
+    if (h <= WATER_LEVEL + 1) return SAND;
+    if (h >= 45) return SNOW;
+    return GRASS;
+  }
+
+  function treeAt(wx, wz) {
+    const h = terrainHeight(wx, wz);
+    if (h <= WATER_LEVEL + 1 || h >= 44) return false;
+    return hash2(wx, wz, (SEED ^ 0x51ab) | 0) < 0.012;
+  }
+
+  function blockIndex(x, y, z) { return y * 256 + z * 16 + x; }
+
+  const FACES = [
+    { dir: [-1, 0, 0], shade: 0.68, corners: [
+      { pos: [0, 1, 0], uv: [0, 1] }, { pos: [0, 0, 0], uv: [0, 0] },
+      { pos: [0, 1, 1], uv: [1, 1] }, { pos: [0, 0, 1], uv: [1, 0] } ] },
+    { dir: [1, 0, 0], shade: 0.68, corners: [
+      { pos: [1, 1, 1], uv: [0, 1] }, { pos: [1, 0, 1], uv: [0, 0] },
+      { pos: [1, 1, 0], uv: [1, 1] }, { pos: [1, 0, 0], uv: [1, 0] } ] },
+    { dir: [0, -1, 0], shade: 0.55, corners: [
+      { pos: [1, 0, 1], uv: [1, 0] }, { pos: [0, 0, 1], uv: [0, 0] },
+      { pos: [1, 0, 0], uv: [1, 1] }, { pos: [0, 0, 0], uv: [0, 1] } ] },
+    { dir: [0, 1, 0], shade: 1.0, corners: [
+      { pos: [0, 1, 1], uv: [1, 1] }, { pos: [1, 1, 1], uv: [0, 1] },
+      { pos: [0, 1, 0], uv: [1, 0] }, { pos: [1, 1, 0], uv: [0, 0] } ] },
+    { dir: [0, 0, -1], shade: 0.82, corners: [
+      { pos: [1, 0, 0], uv: [0, 0] }, { pos: [0, 0, 0], uv: [1, 0] },
+      { pos: [1, 1, 0], uv: [0, 1] }, { pos: [0, 1, 0], uv: [1, 1] } ] },
+    { dir: [0, 0, 1], shade: 0.82, corners: [
+      { pos: [0, 0, 1], uv: [0, 0] }, { pos: [1, 0, 1], uv: [1, 0] },
+      { pos: [0, 1, 1], uv: [0, 1] }, { pos: [1, 1, 1], uv: [1, 1] } ] }
+  ];
+
+  function faceVisible(id, nid) {
+    if (nid === AIR) return true;
+    const nb = BLOCKS[nid];
+    if (!nb) return true;
+    if (nb.opaque) return false;
+    return nid !== id;
+  }
+
+  function raycast(ox, oy, oz, dx, dy, dz, maxDist, isTarget) {
+    let x = Math.floor(ox), y = Math.floor(oy), z = Math.floor(oz);
+    const stepX = dx > 0 ? 1 : -1;
+    const stepY = dy > 0 ? 1 : -1;
+    const stepZ = dz > 0 ? 1 : -1;
+    const tdX = dx !== 0 ? Math.abs(1 / dx) : Infinity;
+    const tdY = dy !== 0 ? Math.abs(1 / dy) : Infinity;
+    const tdZ = dz !== 0 ? Math.abs(1 / dz) : Infinity;
+    let tmX = dx !== 0 ? Math.abs(dx > 0 ? x + 1 - ox : ox - x) * tdX : Infinity;
+    let tmY = dy !== 0 ? Math.abs(dy > 0 ? y + 1 - oy : oy - y) * tdY : Infinity;
+    let tmZ = dz !== 0 ? Math.abs(dz > 0 ? z + 1 - oz : oz - z) * tdZ : Infinity;
+    let face = [0, 0, 0];
+    for (let i = 0; i < 512; i++) {
+      if (isTarget(x, y, z)) return { x, y, z, face };
+      if (tmX < tmY && tmX < tmZ) {
+        if (tmX > maxDist) return null;
+        x += stepX; tmX += tdX; face = [-stepX, 0, 0];
+      } else if (tmY < tmZ) {
+        if (tmY > maxDist) return null;
+        y += stepY; tmY += tdY; face = [0, -stepY, 0];
+      } else {
+        if (tmZ > maxDist) return null;
+        z += stepZ; tmZ += tdZ; face = [0, 0, -stepZ];
+      }
+    }
+    return null;
+  }
+
+  global.WebCraftEngine = {
+    CHUNK, WORLD_H, WATER_LEVEL,
+    AIR, GRASS, DIRT, STONE, SAND, LOG, LEAVES, WATER, PLANKS, COBBLE,
+    GLASS, BRICK, BEDROCK, SNOW, GRAVEL,
+    BLOCKS, FACES,
+    setSeed, getSeed, hash2, noise2, fbm,
+    terrainHeight, surfaceBlock, treeAt, blockIndex, faceVisible, raycast
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
