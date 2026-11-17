@@ -6,8 +6,9 @@
   const BLOCKS = E.BLOCKS, FACES = E.FACES;
   const GRASS = E.GRASS, DIRT = E.DIRT, STONE = E.STONE, SAND = E.SAND,
         LOG = E.LOG, LEAVES = E.LEAVES, PLANKS = E.PLANKS, COBBLE = E.COBBLE,
-        GLASS = E.GLASS, BRICK = E.BRICK, WOOL = E.WOOL, COAL_ORE = E.COAL_ORE,
-        IRON_ORE = E.IRON_ORE, TABLE = E.TABLE, TORCH = E.TORCH;
+        GLASS = E.GLASS, BRICK = E.BRICK, SNOW = E.SNOW, GRAVEL = E.GRAVEL,
+        WOOL = E.WOOL, COAL_ORE = E.COAL_ORE, IRON_ORE = E.IRON_ORE,
+        TABLE = E.TABLE, TORCH = E.TORCH;
 
   const ITEMS = {
     100: { name: 'Charbon', tile: 22 },
@@ -75,6 +76,16 @@
   const invMainEl = document.getElementById('inv-main');
   const invHotbarEl = document.getElementById('inv-hotbar-row');
   const deathEl = document.getElementById('death');
+  const breakBarEl = document.getElementById('break-bar');
+  const breakFillEl = document.getElementById('break-fill');
+  const chatEl = document.getElementById('chat');
+  const chatLogEl = document.getElementById('chat-log');
+  const chatInputEl = document.getElementById('chat-input');
+  const netStatusEl = document.getElementById('net-status');
+  const pauseRoomEl = document.getElementById('pause-room');
+  const nameInput = document.getElementById('player-name');
+  const modeSelect = document.getElementById('mode');
+  const roomInput = document.getElementById('room');
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -507,7 +518,7 @@
     tickQueue.add(x + ',' + y + ',' + (z - 1));
   }
 
-  function applyBlock(x, y, z, id, record) {
+  function applyBlock(x, y, z, id, record, fromNet) {
     if (y < 1 || y >= WORLD_H) return;
     const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK);
     const ch = getChunk(cx, cz);
@@ -519,9 +530,10 @@
     updateTorchRegistry(x, y, z, old, id);
     markDirty(cx, cz, lx, lz);
     scheduleWater(x, y, z);
+    if (!fromNet) netOutBlocks.push([x, y, z, id]);
     if (record) {
       recordEdit(cx, cz, lx, y, lz, id);
-      flushDirty();
+      if (!fromNet) flushDirty();
     }
   }
 
@@ -535,6 +547,7 @@
   }
 
   function saveEdits() {
+    if (netRole === 'guest') return;
     try {
       const obj = {};
       for (const [k, m] of editsByChunk) obj[k] = m;
@@ -821,6 +834,7 @@
   }
 
   function updateHealthUI() {
+    if (gameMode === 'creative') { healthEl.innerHTML = ''; return; }
     let html = '';
     for (let i = 0; i < 10; i++) {
       const v = player.hp - i * 2;
@@ -831,7 +845,7 @@
   }
 
   function damagePlayer(n, kx, kz) {
-    if (player.dead || player.hurtCd > 0 || player.fly) return;
+    if (gameMode === 'creative' || player.dead || player.hurtCd > 0 || player.fly) return;
     player.hp -= n;
     player.hurtCd = 0.5;
     player.regenT = 0;
@@ -990,7 +1004,7 @@
       pos: new THREE.Vector3(x, y, z),
       vel: new THREE.Vector3(),
       yaw: Math.random() * Math.PI * 2,
-      hp: def.hp, onGround: false, hw: def.hw, hh: def.hh,
+      hp: def.hp, onGround: false, hw: def.hw, hh: def.hh, mid: mobSeq++,
       wanderT: 0, moving: false, atkT: 0, hurtT: 0
     };
     m.mesh = makeMobMesh(type);
@@ -1000,30 +1014,38 @@
     return m;
   }
 
+  function rollDrops(def) {
+    const out = [];
+    for (const d of def.drops) {
+      const nDrops = d.min + Math.floor(Math.random() * (d.max - d.min + 1));
+      if (nDrops > 0) out.push([d.id, nDrops]);
+    }
+    return out;
+  }
+
   function killMob(m, byPlayer) {
     const i = mobs.indexOf(m);
     if (i >= 0) mobs.splice(i, 1);
     scene.remove(m.mesh);
     if (byPlayer) {
-      for (const d of m.def.drops) {
-        const nDrops = d.min + Math.floor(Math.random() * (d.max - d.min + 1));
-        if (nDrops > 0) addItem(d.id, nDrops);
-      }
+      for (const d of rollDrops(m.def)) addItem(d[0], d[1]);
     }
   }
 
   function updateMob(m, dt) {
     const distXZ = Math.hypot(player.pos.x - m.pos.x, player.pos.z - m.pos.z);
-    const distY = Math.abs(player.pos.y - m.pos.y);
     m.atkT -= dt;
     m.hurtT -= dt;
-    const chase = m.type === 'zombie' && dayLight < 0.45 && !player.dead && distXZ < 16 && distY < 6;
-    if (chase) {
-      m.yaw = Math.atan2(m.pos.x - player.pos.x, m.pos.z - player.pos.z);
+    const chase = m.type === 'zombie' && gameMode === 'survival' && dayLight < 0.45 && !player.dead;
+    const target = chase ? nearestTarget(m) : null;
+    if (target) {
+      const tDist = Math.hypot(target.x - m.pos.x, target.z - m.pos.z);
+      m.yaw = Math.atan2(m.pos.x - target.x, m.pos.z - target.z);
       m.moving = true;
-      if (distXZ < 1.6 && distY < 2 && m.atkT <= 0) {
+      if (tDist < 1.6 && Math.abs(target.y - m.pos.y) < 2 && m.atkT <= 0) {
         m.atkT = 1.2;
-        damagePlayer(2, player.pos.x - m.pos.x, player.pos.z - m.pos.z);
+        if (target.id === null) damagePlayer(2, target.x - m.pos.x, target.z - m.pos.z);
+        else netPublish({ t: 'hurt', to: target.id, dmg: 2, kx: target.x - m.pos.x, kz: target.z - m.pos.z });
       }
     } else {
       m.wanderT -= dt;
@@ -1402,6 +1424,138 @@
   let debugVisible = false;
   let fpsFrames = 0, fpsTime = 0, fpsValue = 0;
 
+  const HARDNESS = {
+    [LEAVES]: 0.4, [GRASS]: 0.75, [DIRT]: 0.75, [SAND]: 0.75, [GRAVEL]: 0.9,
+    [SNOW]: 0.6, [LOG]: 1.5, [PLANKS]: 1.5, [TABLE]: 1.5, [WOOL]: 1.0,
+    [GLASS]: 0.5, [TORCH]: 0.1, [STONE]: 2.4, [COBBLE]: 2.4, [BRICK]: 2.4,
+    [COAL_ORE]: 2.8, [IRON_ORE]: 3.2
+  };
+  function hardnessFor(id) { return HARDNESS[id] || 1.5; }
+
+  let gameMode = 'survival';
+  let netRole = 'solo';
+  let netClient = null;
+  let netRoom = null;
+  const netId = Math.random().toString(36).slice(2, 10);
+  const netPlayers = new Map();
+  const netOutBlocks = [];
+  let joinTimeout = null;
+  let joining = false;
+  let pendingMode = 'survival';
+  let posTimer = 0;
+  let netSlowTimer = 0;
+  let mining = null;
+  let mouseLeftDown = false;
+  let chatOpen = false;
+  let mobSeq = 1;
+
+  const AVATAR_COLORS = [0x3b6fd4, 0xd43b3b, 0x3bd46f, 0xd4b23b, 0x9b3bd4, 0x3bc9d4];
+
+  function breakBlockAt(x, y, z, id) {
+    applyBlock(x, y, z, AIR, true);
+    const drop = dropFor(id);
+    if (drop !== null) addItem(drop, 1);
+    playSound(170, 0.13, 0.12);
+  }
+
+  function updateMining(dt) {
+    if (!mouseLeftDown || !mining) {
+      breakBarEl.classList.add('hidden');
+      return;
+    }
+    if (document.pointerLockElement !== canvas || invOpen || player.dead) {
+      mining = null;
+      mouseLeftDown = false;
+      breakBarEl.classList.add('hidden');
+      return;
+    }
+    if (!currentHit || currentHit.x !== mining.x || currentHit.y !== mining.y || currentHit.z !== mining.z) {
+      mining = currentHit ? { x: currentHit.x, y: currentHit.y, z: currentHit.z, progress: 0 } : null;
+      if (!mining) return;
+    }
+    const id = getBlock(mining.x, mining.y, mining.z);
+    if (id === AIR || (BLOCKS[id] && BLOCKS[id].unbreakable)) {
+      mining = null;
+      breakBarEl.classList.add('hidden');
+      return;
+    }
+    mining.progress += dt / hardnessFor(id);
+    breakBarEl.classList.remove('hidden');
+    breakFillEl.style.width = Math.min(100, Math.round(mining.progress * 100)) + '%';
+    if (mining.progress >= 1) {
+      breakBlockAt(mining.x, mining.y, mining.z, id);
+      mining = null;
+      breakBarEl.classList.add('hidden');
+    }
+  }
+
+  function makeAvatarMesh(color) {
+    const g = new THREE.Group();
+    const parts = [];
+    function box(w, h, dp, col, x, y, z) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, dp), new THREE.MeshBasicMaterial({ color: col }));
+      m.position.set(x, y, z);
+      g.add(m);
+      parts.push(m);
+      return m;
+    }
+    box(0.5, 0.75, 0.3, color, 0, 1.05, 0);
+    box(0.5, 0.5, 0.5, 0xd8a77a, 0, 1.65, 0);
+    box(0.2, 0.7, 0.2, 0x3a3a5c, -0.13, 0.35, 0);
+    box(0.2, 0.7, 0.2, 0x3a3a5c, 0.13, 0.35, 0);
+    box(0.2, 0.65, 0.2, color, -0.36, 1.1, 0);
+    box(0.2, 0.65, 0.2, color, 0.36, 1.1, 0);
+    g.userData.parts = parts;
+    return g;
+  }
+
+  function playerName() {
+    const v = nameInput.value.trim();
+    return v || 'Joueur' + netId.slice(0, 3);
+  }
+
+  function upsertPlayer(id, name, x, y, z, yaw, pitch) {
+    let p = netPlayers.get(id);
+    if (!p) {
+      const color = AVATAR_COLORS[Math.abs(hashString(id)) % AVATAR_COLORS.length];
+      p = { name: name || 'Joueur', x, y, z, yaw: yaw || 0, pitch: pitch || 0,
+            lastSeen: performance.now(), mesh: makeAvatarMesh(color) };
+      scene.add(p.mesh);
+      netPlayers.set(id, p);
+      addChatLine('*', p.name + ' a rejoint la partie');
+    } else {
+      p.x = x; p.y = y; p.z = z;
+      p.yaw = yaw || p.yaw;
+      p.pitch = pitch || 0;
+      p.lastSeen = performance.now();
+      if (name) p.name = name;
+    }
+  }
+
+  function updateNetPlayers() {
+    const nowMs = performance.now();
+    for (const [id, p] of netPlayers) {
+      if (nowMs - p.lastSeen > 10000) {
+        scene.remove(p.mesh);
+        netPlayers.delete(id);
+        continue;
+      }
+      p.mesh.position.set(p.x, p.y, p.z);
+      p.mesh.rotation.y = p.yaw;
+    }
+  }
+
+  function nearestTarget(m) {
+    let best = null, bestD = 16;
+    const cands = [{ x: player.pos.x, y: player.pos.y, z: player.pos.z, id: null }];
+    for (const [id, p] of netPlayers) cands.push({ x: p.x, y: p.y, z: p.z, id });
+    for (const c of cands) {
+      const d = Math.hypot(c.x - m.pos.x, c.z - m.pos.z);
+      if (d < bestD) { bestD = d; best = c; }
+    }
+    return best;
+  }
+
   let audioCtx = null;
   function playSound(freq, dur, vol) {
     try {
@@ -1420,6 +1574,224 @@
       o.start(t);
       o.stop(t + dur);
     } catch (err) {}
+  }
+
+  function makeRoomCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let c = '';
+    for (let i = 0; i < 5; i++) c += chars[Math.floor(Math.random() * chars.length)];
+    return c;
+  }
+
+  function netStatus(msg, isError) {
+    netStatusEl.textContent = msg;
+    netStatusEl.classList.toggle('error', !!isError);
+  }
+
+  function netPublish(obj) {
+    if (netClient && netRoom) {
+      try { netClient.publish('webcraft/v1/' + netRoom, JSON.stringify(obj)); } catch (err) {}
+    }
+  }
+
+  function netEnd() {
+    if (netClient) { try { netClient.end(true); } catch (err) {} netClient = null; }
+    netRoom = null;
+  }
+
+  function startNet(role) {
+    if (typeof mqtt === 'undefined') {
+      netStatus('Multijoueur indisponible (mqtt.min.js manquant)', true);
+      return;
+    }
+    netEnd();
+    if (role === 'join') {
+      const code = roomInput.value.trim().toUpperCase();
+      if (code.length < 4) {
+        netStatus('Entre le code du salon (5 caract\u00e8res)', true);
+        return;
+      }
+      netRoom = code;
+      joining = true;
+    } else {
+      netRoom = makeRoomCode();
+      roomInput.value = netRoom;
+    }
+    netStatus('Connexion au serveur\u2026');
+    netClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+      clientId: 'webcraft_' + netId, keepalive: 30, reconnectPeriod: 0, connectTimeout: 8000
+    });
+    netClient.on('connect', () => {
+      netClient.subscribe('webcraft/v1/' + netRoom);
+      if (role === 'host') {
+        netStatus('Salon cr\u00e9\u00e9 : ' + netRoom);
+        startGame('host');
+      } else {
+        netPublish({ t: 'hello', from: netId, name: playerName() });
+        netStatus('Recherche de la partie ' + netRoom + '\u2026');
+        joinTimeout = setTimeout(() => {
+          if (gameState === 'menu') {
+            joining = false;
+            netStatus('Partie introuvable. V\u00e9rifie le code.', true);
+            netEnd();
+          }
+        }, 8000);
+      }
+    });
+    netClient.on('message', onNetMessage);
+    netClient.on('error', () => {
+      if (gameState === 'menu') netStatus('Erreur de connexion au serveur', true);
+    });
+  }
+
+  function onNetMessage(topic, payload) {
+    let msg;
+    try { msg = JSON.parse(payload.toString()); } catch (err) { return; }
+    if (!msg || msg.from === netId) return;
+    if (msg.t === 'hello') {
+      if (netRole !== 'host' || gameState !== 'playing') return;
+      upsertPlayer(msg.from, msg.name, player.pos.x, player.pos.y, player.pos.z, 0, 0);
+      const editsObj = {};
+      for (const [k, m] of editsByChunk) editsObj[k] = m;
+      netPublish({ t: 'welcome', from: netId, seed: E.getSeed(), mode: gameMode, edits: editsObj, dayTime });
+      return;
+    }
+    if (msg.t === 'welcome') {
+      if (!joining) return;
+      joining = false;
+      if (joinTimeout) { clearTimeout(joinTimeout); joinTimeout = null; }
+      pendingMode = msg.mode === 'creative' ? 'creative' : 'survival';
+      E.setSeed(msg.seed | 0);
+      editsByChunk.clear();
+      for (const k in (msg.edits || {})) editsByChunk.set(k, msg.edits[k]);
+      dayTime = typeof msg.dayTime === 'number' ? msg.dayTime : 0.03;
+      netStatus('Connect\u00e9 \u00e0 ' + netRoom);
+      startGame('guest');
+      return;
+    }
+    if (gameState !== 'playing') return;
+    switch (msg.t) {
+      case 'pos':
+        upsertPlayer(msg.from, msg.name, msg.x, msg.y, msg.z, msg.yaw, msg.pitch);
+        break;
+      case 'blocks':
+        for (const c of (msg.changes || [])) applyBlock(c[0], c[1], c[2], c[3], true, true);
+        flushDirty();
+        break;
+      case 'mobs':
+        if (netRole === 'guest') updateMobMirrors(msg.list || []);
+        break;
+      case 'time':
+        if (netRole === 'guest' && typeof msg.v === 'number') dayTime = msg.v;
+        break;
+      case 'chat':
+        addChatLine(msg.name || '?', msg.text || '');
+        break;
+      case 'hurt':
+        if (msg.to === netId) damagePlayer(msg.dmg || 2, msg.kx, msg.kz);
+        break;
+      case 'give':
+        if (msg.to === netId) addItem(msg.item, msg.count || 1);
+        break;
+      case 'mobhit':
+        if (netRole === 'host') {
+          let best = null, bestD = 2.5;
+          for (const m of mobs) {
+            const d = Math.hypot(m.pos.x - msg.x, m.pos.y - msg.y, m.pos.z - msg.z);
+            if (d < bestD) { bestD = d; best = m; }
+          }
+          if (best) {
+            best.hp -= msg.dmg || 1;
+            best.hurtT = 0.2;
+            if (best.hp <= 0) {
+              const drops = rollDrops(best.def);
+              killMob(best, false);
+              for (const d of drops) netPublish({ t: 'give', to: msg.from, item: d[0], count: d[1] });
+            }
+          }
+        }
+        break;
+      case 'bye': {
+        const p = netPlayers.get(msg.from);
+        if (p) {
+          scene.remove(p.mesh);
+          netPlayers.delete(msg.from);
+          addChatLine('*', p.name + ' a quitt\u00e9 la partie');
+        }
+        break;
+      }
+    }
+  }
+
+  function updateMobMirrors(list) {
+    const seen = new Set();
+    for (const e of list) {
+      if (!Array.isArray(e) || e.length < 6 || !MOB_DEFS[e[1]]) continue;
+      const mid = e[0], type = e[1], x = e[2], y = e[3], z = e[4], yaw = e[5];
+      seen.add(mid);
+      let m = null;
+      for (const mm of mobs) {
+        if (mm.mid === mid) { m = mm; break; }
+      }
+      if (!m) {
+        m = spawnMob(type, x, y, z);
+        m.mid = mid;
+      }
+      m.pos.set(x, y, z);
+      m.yaw = yaw;
+      m.mesh.position.set(x, y, z);
+      m.mesh.rotation.y = yaw;
+    }
+    for (let i = mobs.length - 1; i >= 0; i--) {
+      if (!seen.has(mobs[i].mid)) killMob(mobs[i], false);
+    }
+  }
+
+  function addChatLine(name, text) {
+    const line = document.createElement('div');
+    line.textContent = name === '*' ? text : '<' + name + '> ' + text;
+    chatLogEl.appendChild(line);
+    chatLogEl.scrollTop = chatLogEl.scrollHeight;
+    while (chatLogEl.children.length > 8) chatLogEl.removeChild(chatLogEl.firstChild);
+  }
+
+  function closeChat(send) {
+    const text = chatInputEl.value.trim();
+    chatOpen = false;
+    chatEl.classList.add('hidden');
+    if (send && text) {
+      if (netRole === 'solo') addChatLine(playerName(), text);
+      else netPublish({ t: 'chat', from: netId, name: playerName(), text });
+    }
+    if (gameState === 'playing' && !invOpen && !player.dead) canvas.requestPointerLock();
+  }
+
+  function netTick(dt) {
+    if (netRole === 'solo' || !netClient) return;
+    posTimer -= dt;
+    if (posTimer <= 0) {
+      posTimer = 0.1;
+      netPublish({
+        t: 'pos', from: netId, name: playerName(),
+        x: +player.pos.x.toFixed(2), y: +player.pos.y.toFixed(2), z: +player.pos.z.toFixed(2),
+        yaw: +player.yaw.toFixed(2), pitch: +player.pitch.toFixed(2)
+      });
+    }
+    netSlowTimer -= dt;
+    if (netSlowTimer <= 0) {
+      netSlowTimer = 0.3;
+      if (netOutBlocks.length) {
+        const changes = netOutBlocks.splice(0, netOutBlocks.length);
+        netPublish({ t: 'blocks', from: netId, changes });
+      }
+      if (netRole === 'host') {
+        netPublish({
+          t: 'mobs', from: netId,
+          list: mobs.map((m) => [m.mid, m.type, +m.pos.x.toFixed(2), +m.pos.y.toFixed(2), +m.pos.z.toFixed(2), +m.yaw.toFixed(2)])
+        });
+        netPublish({ t: 'time', from: netId, v: +dayTime.toFixed(4) });
+      }
+    }
   }
 
   function hashString(s) {
@@ -1452,13 +1824,17 @@
            z + 1 > p.z - hw && z < p.z + hw;
   }
 
-  function startGame() {
-    const raw = seedInput.value.trim();
-    let seed = parseInt(raw, 10);
-    if (!Number.isFinite(seed) || String(seed) !== raw) seed = hashString(raw || String(Date.now()));
-    E.setSeed(seed);
-    try { localStorage.setItem('webcraft_seed', String(seed)); } catch (e) {}
-    loadEdits(seed);
+  function startGame(role) {
+    netRole = role || 'solo';
+    if (netRole !== 'guest') {
+      const raw = seedInput.value.trim();
+      let seed = parseInt(raw, 10);
+      if (!Number.isFinite(seed) || String(seed) !== raw) seed = hashString(raw || String(Date.now()));
+      E.setSeed(seed);
+      try { localStorage.setItem('webcraft_seed', String(seed)); } catch (e) {}
+      loadEdits(seed);
+    }
+    gameMode = netRole === 'guest' ? pendingMode : modeSelect.value;
     renderDist = parseInt(renderDistSelect.value, 10) || 4;
     applyRenderDistance();
     resetWorld();
@@ -1474,6 +1850,12 @@
     cursorStack = null;
     craftResult = null;
     selectedSlot = 0;
+    if (gameMode === 'creative') {
+      [GRASS, DIRT, STONE, SAND, LOG, LEAVES, PLANKS, COBBLE, GLASS, BRICK,
+       SNOW, GRAVEL, WOOL, COAL_ORE, IRON_ORE, TABLE, TORCH].forEach((id, i) => {
+        inv[i] = { id, count: 64 };
+      });
+    }
     updateHealthUI();
     updateHotbarUI();
     gameState = 'loading';
@@ -1483,6 +1865,12 @@
     deathEl.classList.add('hidden');
     hud.classList.remove('hidden');
     loadingEl.classList.remove('hidden');
+    if (netRole === 'host') {
+      pauseRoomEl.textContent = 'Salon : ' + netRoom + ' \u2014 partage ce code avec tes amis';
+      pauseRoomEl.classList.remove('hidden');
+    } else {
+      pauseRoomEl.classList.add('hidden');
+    }
   }
 
   function resetWorld() {
@@ -1494,6 +1882,7 @@
     tickQueue.clear();
     dirtyChunks.clear();
     waterTimer = 0;
+    netOutBlocks.length = 0;
     while (mobs.length) killMob(mobs[0], false);
   }
 
@@ -1522,6 +1911,12 @@
 
   function quitToMenu() {
     saveEdits();
+    if (netRole !== 'solo') {
+      netPublish({ t: 'bye', from: netId });
+      for (const p of netPlayers.values()) scene.remove(p.mesh);
+      netPlayers.clear();
+    }
+    netEnd();
     gameState = 'menu';
     pauseEl.classList.add('hidden');
     hud.classList.add('hidden');
@@ -1569,7 +1964,9 @@
       '<br>Temps: ' + phase + ' (' + hour + 'h, lumi\u00e8re ' + dayLight.toFixed(2) + ')' +
       '<br>Chunks: ' + chunks.size + ' (file: ' + meshQueue.length + ', \u00e9dits: ' + editCount + ')' +
       '<br>Mobs: ' + mobs.length +
-      '<br>Vie: ' + player.hp + ' / 20' +
+      '<br>Mode: ' + (gameMode === 'creative' ? 'Cr\u00e9atif' : 'Survie') +
+      (netRoom ? ' \u00b7 Salon ' + netRoom + ' (' + (netPlayers.size + 1) + ' joueurs)' : '') +
+      '<br>Vie: ' + (gameMode === 'creative' ? '\u221e' : player.hp + ' / 20') +
       '<br>Graine: ' + E.getSeed() +
       '<br>Vol: ' + (player.fly ? 'oui' : 'non');
   }
@@ -1579,9 +1976,11 @@
     if (locked) {
       hintEl.classList.add('hidden');
       pauseEl.classList.add('hidden');
-    } else if (gameState === 'playing' && !invOpen && !player.dead) {
+    } else if (gameState === 'playing' && !invOpen && !chatOpen && !player.dead) {
       pauseEl.classList.remove('hidden');
       keys.clear();
+      mining = null;
+      mouseLeftDown = false;
       saveEdits();
     }
   });
@@ -1609,6 +2008,15 @@
     }
     if (e.code === 'Escape' && invOpen) {
       closeInventory();
+      return;
+    }
+    if (e.code === 'KeyT' && !invOpen && !player.dead) {
+      e.preventDefault();
+      chatOpen = true;
+      chatEl.classList.remove('hidden');
+      chatInputEl.value = '';
+      if (document.pointerLockElement === canvas) document.exitPointerLock();
+      setTimeout(() => { try { chatInputEl.focus(); } catch (err) {} }, 50);
       return;
     }
     if (invOpen || player.dead) return;
@@ -1645,23 +2053,29 @@
       if (mob) {
         const held = inv[selectedSlot];
         const dmg = held && held.id >= 100 && ITEMS[held.id].sword ? ITEMS[held.id].sword : 1;
-        mob.hp -= dmg;
         mob.hurtT = 0.2;
-        const kx = mob.pos.x - player.pos.x, kz = mob.pos.z - player.pos.z;
-        const kd = Math.hypot(kx, kz) || 1;
-        mob.vel.x += kx / kd * 6;
-        mob.vel.z += kz / kd * 6;
-        mob.vel.y = 4;
         playSound(220, 0.12, 0.14);
-        if (mob.hp <= 0) killMob(mob, true);
+        if (netRole === 'guest') {
+          netPublish({ t: 'mobhit', from: netId, x: mob.pos.x, y: mob.pos.y, z: mob.pos.z, dmg });
+        } else {
+          mob.hp -= dmg;
+          const kx = mob.pos.x - player.pos.x, kz = mob.pos.z - player.pos.z;
+          const kd = Math.hypot(kx, kz) || 1;
+          mob.vel.x += kx / kd * 6;
+          mob.vel.z += kz / kd * 6;
+          mob.vel.y = 4;
+          if (mob.hp <= 0) killMob(mob, true);
+        }
         return;
       }
       const id = getBlock(currentHit.x, currentHit.y, currentHit.z);
       if (BLOCKS[id] && BLOCKS[id].unbreakable) return;
-      applyBlock(currentHit.x, currentHit.y, currentHit.z, AIR, true);
-      const drop = dropFor(id);
-      if (drop !== null) addItem(drop, 1);
-      playSound(170, 0.13, 0.12);
+      if (gameMode === 'creative') {
+        breakBlockAt(currentHit.x, currentHit.y, currentHit.z, id);
+      } else {
+        mining = { x: currentHit.x, y: currentHit.y, z: currentHit.z, progress: 0 };
+        mouseLeftDown = true;
+      }
     } else if (e.button === 1) {
       e.preventDefault();
       const id = getBlock(currentHit.x, currentHit.y, currentHit.z);
@@ -1695,8 +2109,10 @@
       if (cur !== AIR && !E.isWater(cur)) return;
       if (E.isSolid(held.id) && blockIntersectsPlayer(px, py, pz)) return;
       applyBlock(px, py, pz, held.id, true);
-      held.count--;
-      if (held.count <= 0) inv[selectedSlot] = null;
+      if (gameMode === 'survival') {
+        held.count--;
+        if (held.count <= 0) inv[selectedSlot] = null;
+      }
       updateHotbarUI();
       playSound(300, 0.09, 0.1);
     }
@@ -1709,7 +2125,9 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  document.getElementById('btn-play').addEventListener('click', startGame);
+  document.getElementById('btn-solo').addEventListener('click', () => startGame('solo'));
+  document.getElementById('btn-host').addEventListener('click', () => startNet('host'));
+  document.getElementById('btn-join').addEventListener('click', () => startNet('join'));
   document.getElementById('btn-resume').addEventListener('click', () => canvas.requestPointerLock());
   document.getElementById('btn-quit').addEventListener('click', quitToMenu);
   document.getElementById('btn-respawn').addEventListener('click', respawn);
@@ -1721,6 +2139,16 @@
     }
     keysToRemove.forEach((k) => localStorage.removeItem(k));
     location.reload();
+  });
+
+  document.addEventListener('mouseup', (e) => {
+    if (e.button === 0) { mouseLeftDown = false; mining = null; }
+  });
+
+  chatInputEl.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.code === 'Enter') closeChat(true);
+    else if (e.code === 'Escape') closeChat(false);
   });
 
   try {
@@ -1776,15 +2204,20 @@
       waterTimer += dt;
       if (waterTimer >= 0.25) {
         waterTimer = 0;
-        tickWater();
+        if (netRole !== 'guest') tickWater();
       }
-      for (let i = mobs.length - 1; i >= 0; i--) {
-        const m = mobs[i];
-        const d = Math.hypot(m.pos.x - player.pos.x, m.pos.z - player.pos.z);
-        if (d > renderDist * 16 + 24) { killMob(m, false); continue; }
-        updateMob(m, dt);
+      if (netRole !== 'guest') {
+        for (let i = mobs.length - 1; i >= 0; i--) {
+          const m = mobs[i];
+          const d = Math.hypot(m.pos.x - player.pos.x, m.pos.z - player.pos.z);
+          if (d > renderDist * 16 + 24) { killMob(m, false); continue; }
+          updateMob(m, dt);
+        }
+        trySpawnMobs(dt);
       }
-      trySpawnMobs(dt);
+      updateMining(dt);
+      updateNetPlayers();
+      netTick(dt);
       updateChunks(false);
       processMeshQueue(2);
       updateCamera();
@@ -1811,6 +2244,14 @@
     tickWater,
     spawnMob,
     damage: damagePlayer,
+    setMode(m) { gameMode = m; updateHealthUI(); },
+    hardnessFor,
+    netPublish,
+    onNetMessage,
+    upsertPlayer,
+    netPlayers,
+    get gameMode() { return gameMode; },
+    get netRole() { return netRole; },
     get craftResult() { return craftResult; },
     getState() {
       return {

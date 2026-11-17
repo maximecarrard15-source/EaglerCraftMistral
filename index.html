@@ -15,12 +15,18 @@
 
 <div id="hud" class="hidden">
   <div id="crosshair"></div>
+  <div id="break-bar" class="hidden"><div id="break-fill"></div></div>
   <div id="debug" class="hidden"></div>
   <div id="health"></div>
   <div id="hotbar"></div>
 </div>
 
 <div id="cursor-stack" class="hidden"></div>
+
+<div id="chat" class="hidden">
+  <div id="chat-log"></div>
+  <input id="chat-input" type="text" maxlength="120" placeholder="Message… (Entrée : envoyer, Échap : fermer)" autocomplete="off" />
+</div>
 
 <div id="hint" class="overlay hidden">
   <div class="panel small">
@@ -40,32 +46,39 @@
   <div class="panel">
     <h1>WEBCRAFT</h1>
     <p class="subtitle">Un Minecraft survie qui tourne entièrement dans votre navigateur</p>
-    <label>Graine du monde
-      <input id="seed" type="text" placeholder="aléatoire" autocomplete="off" />
+    <label>Pseudo
+      <input id="player-name" type="text" placeholder="Joueur" maxlength="16" autocomplete="off" />
     </label>
-    <label>Distance d'affichage
-      <select id="render-dist">
-        <option value="3">3 — rapide</option>
-        <option value="4" selected>4 — normal</option>
-        <option value="6">6 — loin</option>
-        <option value="8">8 — très loin</option>
+    <label>Mode de jeu
+      <select id="mode">
+        <option value="survival" selected>Survie — vie, casse lente, zombies</option>
+        <option value="creative">Créatif — casse instantanée, blocs infinis, vol</option>
       </select>
     </label>
-    <button id="btn-play" class="mc-btn">Jouer en solo</button>
+    <button id="btn-solo" class="mc-btn">Jouer en solo</button>
+    <label>Code de salon — multijoueur
+      <input id="room" type="text" placeholder="ex : 7XK2M" maxlength="5" autocomplete="off" />
+    </label>
+    <div class="btn-row">
+      <button id="btn-host" class="mc-btn">Héberger</button>
+      <button id="btn-join" class="mc-btn">Rejoindre</button>
+    </div>
+    <p id="net-status" class="sub"></p>
     <button id="btn-reset" class="mc-btn secondary">Nouveau monde (efface la sauvegarde)</button>
     <div class="controls">
       <p><b>ZQSD / WASD</b> se déplacer · <b>Espace</b> sauter / nager · <b>Maj</b> sprinter</p>
-      <p><b>Clic gauche</b> casser / attaquer · <b>Clic droit</b> poser / manger</p>
-      <p><b>E</b> inventaire (craft 2×2) · <b>Clic droit sur un établi</b> craft 3×3</p>
-      <p><b>Molette / 1-9</b> sélection · <b>F</b> voler · <b>F3</b> infos détaillées · <b>Échap</b> pause</p>
+      <p><b>Clic gauche</b> miner (maintenir) / attaquer · <b>Clic droit</b> poser / manger / établi</p>
+      <p><b>E</b> inventaire (craft 2×2) · <b>Molette / 1-9</b> sélection</p>
+      <p><b>T</b> chat (en ligne) · <b>F</b> voler · <b>F3</b> infos détaillées · <b>Échap</b> pause</p>
     </div>
-    <p class="footer">100 % local, aucun serveur — vos mondes sont sauvegardés dans votre navigateur</p>
+    <p class="footer">100 % local en solo — en multijoueur, connexion via un relais public (le monde est hébergé par celui qui crée le salon)</p>
   </div>
 </div>
 
 <div id="pause" class="overlay dirt-bg hidden">
   <div class="panel">
     <h2>Jeu en pause</h2>
+    <p id="pause-room" class="sub hidden"></p>
     <button id="btn-resume" class="mc-btn">Reprendre</button>
     <button id="btn-quit" class="mc-btn secondary">Sauvegarder et quitter</button>
   </div>
@@ -93,6 +106,7 @@
 </div>
 
 <script src="js/three.min.js"></script>
+<script src="js/mqtt.min.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/game.js"></script>
 </body>

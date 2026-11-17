@@ -277,3 +277,51 @@ input, select {
 .inv-hint { margin-top: 14px; font-size: 11px; color: #999; }
 
 #death { background: rgba(120, 0, 0, 0.5); z-index: 20; }
+
+.btn-row { display: flex; gap: 8px; }
+.btn-row .mc-btn { margin: 10px 0; }
+
+#room { text-transform: uppercase; }
+
+#net-status { min-height: 16px; color: #ffff55; }
+#net-status.error { color: #ff6b6b; }
+
+#break-bar {
+  position: fixed;
+  top: calc(50% + 26px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 2px solid #fff;
+  z-index: 5;
+  pointer-events: none;
+}
+
+#break-fill { height: 100%; width: 0%; background: #e8e8e8; }
+
+#chat {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  width: 420px;
+  max-width: 60vw;
+  z-index: 8;
+}
+
+#chat-log { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+
+#chat-log div {
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 12px;
+  padding: 3px 8px;
+  width: fit-content;
+  max-width: 100%;
+  text-shadow: 1px 1px 0 #000;
+}
+
+#chat-input { width: 100%; margin: 0; background: rgba(0, 0, 0, 0.6); }
+
+#pause-room { color: #ffff55; font-size: 13px; margin-bottom: 10px; }
