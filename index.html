@@ -11,17 +11,21 @@
 <canvas id="game-canvas"></canvas>
 
 <div id="underwater" class="hidden"></div>
+<div id="damage-flash"></div>
 
 <div id="hud" class="hidden">
   <div id="crosshair"></div>
   <div id="debug" class="hidden"></div>
+  <div id="health"></div>
   <div id="hotbar"></div>
 </div>
+
+<div id="cursor-stack" class="hidden"></div>
 
 <div id="hint" class="overlay hidden">
   <div class="panel small">
     <p class="big">Cliquez pour jouer</p>
-    <p class="sub">Échap pour mettre en pause</p>
+    <p class="sub">Échap pour mettre en pause · E pour l'inventaire</p>
   </div>
 </div>
 
@@ -35,7 +39,7 @@
 <div id="menu" class="overlay dirt-bg">
   <div class="panel">
     <h1>WEBCRAFT</h1>
-    <p class="subtitle">Un Minecraft qui tourne entièrement dans votre navigateur</p>
+    <p class="subtitle">Un Minecraft survie qui tourne entièrement dans votre navigateur</p>
     <label>Graine du monde
       <input id="seed" type="text" placeholder="aléatoire" autocomplete="off" />
     </label>
@@ -50,9 +54,10 @@
     <button id="btn-play" class="mc-btn">Jouer en solo</button>
     <button id="btn-reset" class="mc-btn secondary">Nouveau monde (efface la sauvegarde)</button>
     <div class="controls">
-      <p><b>ZQSD / WASD</b> se déplacer · <b>Espace</b> sauter · <b>Maj</b> sprinter</p>
-      <p><b>Clic gauche</b> casser · <b>Clic droit</b> poser · <b>Molette / 1-9</b> choisir un bloc</p>
-      <p><b>F</b> voler · <b>F3</b> infos de debug · <b>Échap</b> pause</p>
+      <p><b>ZQSD / WASD</b> se déplacer · <b>Espace</b> sauter / nager · <b>Maj</b> sprinter</p>
+      <p><b>Clic gauche</b> casser / attaquer · <b>Clic droit</b> poser / manger</p>
+      <p><b>E</b> inventaire (craft 2×2) · <b>Clic droit sur un établi</b> craft 3×3</p>
+      <p><b>Molette / 1-9</b> sélection · <b>F</b> voler · <b>F3</b> infos détaillées · <b>Échap</b> pause</p>
     </div>
     <p class="footer">100 % local, aucun serveur — vos mondes sont sauvegardés dans votre navigateur</p>
   </div>
@@ -63,6 +68,27 @@
     <h2>Jeu en pause</h2>
     <button id="btn-resume" class="mc-btn">Reprendre</button>
     <button id="btn-quit" class="mc-btn secondary">Sauvegarder et quitter</button>
+  </div>
+</div>
+
+<div id="inventory" class="overlay hidden">
+  <div class="panel inv-panel">
+    <h2 id="inv-title">Inventaire</h2>
+    <div id="craft-area">
+      <div id="craft-grid"></div>
+      <div class="arrow">→</div>
+      <div id="result-slot" class="slot result"></div>
+    </div>
+    <div id="inv-main"></div>
+    <div id="inv-hotbar-row"></div>
+    <p class="inv-hint">Clic gauche : prendre/poser · Clic droit : moitié / 1 par 1 · E ou Échap pour fermer</p>
+  </div>
+</div>
+
+<div id="death" class="overlay hidden">
+  <div class="panel">
+    <h2>Vous êtes mort !</h2>
+    <button id="btn-respawn" class="mc-btn">Réapparaître</button>
   </div>
 </div>
 

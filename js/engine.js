@@ -3,27 +3,42 @@
   const CHUNK = 16;
   const WORLD_H = 64;
   const WATER_LEVEL = 22;
+  const ATLAS_COLS = 8;
 
   const AIR = 0, GRASS = 1, DIRT = 2, STONE = 3, SAND = 4, LOG = 5, LEAVES = 6,
         WATER = 7, PLANKS = 8, COBBLE = 9, GLASS = 10, BRICK = 11, BEDROCK = 12,
-        SNOW = 13, GRAVEL = 14;
+        SNOW = 13, GRAVEL = 14, WOOL = 15, COAL_ORE = 16, IRON_ORE = 17,
+        TABLE = 18, TORCH = 19;
 
   const BLOCKS = {
-    [GRASS]:   { name: 'Herbe',          top: 0,  bottom: 2,  side: 1,  opaque: true,  solid: true },
-    [DIRT]:    { name: 'Terre',          top: 2,  bottom: 2,  side: 2,  opaque: true,  solid: true },
-    [STONE]:   { name: 'Pierre',         top: 3,  bottom: 3,  side: 3,  opaque: true,  solid: true },
-    [SAND]:    { name: 'Sable',          top: 4,  bottom: 4,  side: 4,  opaque: true,  solid: true },
-    [LOG]:     { name: 'Bois',           top: 6,  bottom: 6,  side: 5,  opaque: true,  solid: true },
-    [LEAVES]:  { name: 'Feuilles',       top: 7,  bottom: 7,  side: 7,  opaque: true,  solid: true },
-    [WATER]:   { name: 'Eau',            top: 8,  bottom: 8,  side: 8,  opaque: false, solid: false, fluid: true },
-    [PLANKS]:  { name: 'Planches',       top: 9,  bottom: 9,  side: 9,  opaque: true,  solid: true },
-    [COBBLE]:  { name: 'Pierre taillée', top: 10, bottom: 10, side: 10, opaque: true,  solid: true },
-    [GLASS]:   { name: 'Verre',          top: 11, bottom: 11, side: 11, opaque: false, solid: true },
-    [BRICK]:   { name: 'Brique',         top: 12, bottom: 12, side: 12, opaque: true,  solid: true },
-    [BEDROCK]: { name: 'Bedrock',        top: 13, bottom: 13, side: 13, opaque: true,  solid: true, unbreakable: true },
-    [SNOW]:    { name: 'Neige',          top: 14, bottom: 14, side: 14, opaque: true,  solid: true },
-    [GRAVEL]:  { name: 'Gravier',        top: 15, bottom: 15, side: 15, opaque: true,  solid: true }
+    [GRASS]:    { name: 'Herbe',            top: 0,  bottom: 2,  side: 1,  opaque: true,  solid: true },
+    [DIRT]:     { name: 'Terre',            top: 2,  bottom: 2,  side: 2,  opaque: true,  solid: true },
+    [STONE]:    { name: 'Pierre',           top: 3,  bottom: 3,  side: 3,  opaque: true,  solid: true },
+    [SAND]:     { name: 'Sable',            top: 4,  bottom: 4,  side: 4,  opaque: true,  solid: true },
+    [LOG]:      { name: 'Bûche',            top: 6,  bottom: 6,  side: 5,  opaque: true,  solid: true },
+    [LEAVES]:   { name: 'Feuilles',         top: 7,  bottom: 7,  side: 7,  opaque: true,  solid: true },
+    [WATER]:    { name: 'Eau',              top: 8,  bottom: 8,  side: 8,  opaque: false, solid: false, fluid: true },
+    [PLANKS]:   { name: 'Planches',         top: 9,  bottom: 9,  side: 9,  opaque: true,  solid: true },
+    [COBBLE]:   { name: 'Pierre taillée',   top: 10, bottom: 10, side: 10, opaque: true,  solid: true },
+    [GLASS]:    { name: 'Verre',            top: 11, bottom: 11, side: 11, opaque: false, solid: true },
+    [BRICK]:    { name: 'Brique',           top: 12, bottom: 12, side: 12, opaque: true,  solid: true },
+    [BEDROCK]:  { name: 'Bedrock',          top: 13, bottom: 13, side: 13, opaque: true,  solid: true, unbreakable: true },
+    [SNOW]:     { name: 'Neige',            top: 14, bottom: 14, side: 14, opaque: true,  solid: true },
+    [GRAVEL]:   { name: 'Gravier',          top: 15, bottom: 15, side: 15, opaque: true,  solid: true },
+    [WOOL]:     { name: 'Laine',            top: 21, bottom: 21, side: 21, opaque: true,  solid: true },
+    [COAL_ORE]: { name: 'Minerai de charbon', top: 16, bottom: 16, side: 16, opaque: true, solid: true },
+    [IRON_ORE]: { name: 'Minerai de fer',   top: 17, bottom: 17, side: 17, opaque: true,  solid: true },
+    [TABLE]:    { name: 'Établi',           top: 18, bottom: 9,  side: 19, opaque: true,  solid: true },
+    [TORCH]:    { name: 'Torche',           top: 20, bottom: 20, side: 20, opaque: false, solid: false, torch: true }
   };
+
+  for (let l = 8; l >= 1; l--) {
+    BLOCKS[47 - l] = { name: 'Eau', top: 8, bottom: 8, side: 8, opaque: false, solid: false, fluid: true, level: l };
+  }
+
+  function isWater(id) { return id === WATER || (id >= 39 && id <= 46); }
+  function waterLevel(id) { return id === WATER ? 8 : (id >= 39 && id <= 46 ? 47 - id : 0); }
+  function isSolid(id) { const b = BLOCKS[id]; return !!(b && b.solid); }
 
   let SEED = 1337;
   function setSeed(s) { SEED = s | 0; }
@@ -31,6 +46,13 @@
 
   function hash2(x, y, s) {
     let h = (s | 0) ^ Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  }
+
+  function hash3(x, y, z, s) {
+    let h = (s | 0) ^ Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(z | 0, 2246822519);
     h = Math.imul(h ^ (h >>> 13), 1274126177);
     h ^= h >>> 16;
     return (h >>> 0) / 4294967296;
@@ -69,6 +91,12 @@
     if (h <= WATER_LEVEL + 1) return SAND;
     if (h >= 45) return SNOW;
     return GRASS;
+  }
+
+  function oreAt(wx, y, wz) {
+    if (y < 44 && hash3(wx, y, wz, (SEED ^ 0x7777) | 0) < 0.012) return COAL_ORE;
+    if (y < 26 && hash3(wx, y, wz, (SEED ^ 0xaaaa) | 0) < 0.007) return IRON_ORE;
+    return STONE;
   }
 
   function treeAt(wx, wz) {
@@ -137,11 +165,12 @@
   }
 
   global.WebCraftEngine = {
-    CHUNK, WORLD_H, WATER_LEVEL,
+    CHUNK, WORLD_H, WATER_LEVEL, ATLAS_COLS,
     AIR, GRASS, DIRT, STONE, SAND, LOG, LEAVES, WATER, PLANKS, COBBLE,
-    GLASS, BRICK, BEDROCK, SNOW, GRAVEL,
+    GLASS, BRICK, BEDROCK, SNOW, GRAVEL, WOOL, COAL_ORE, IRON_ORE, TABLE, TORCH,
     BLOCKS, FACES,
-    setSeed, getSeed, hash2, noise2, fbm,
-    terrainHeight, surfaceBlock, treeAt, blockIndex, faceVisible, raycast
+    setSeed, getSeed, hash2, hash3, noise2, fbm,
+    terrainHeight, surfaceBlock, oreAt, treeAt, blockIndex, faceVisible, raycast,
+    isWater, waterLevel, isSolid
   };
 })(typeof window !== 'undefined' ? window : globalThis);
