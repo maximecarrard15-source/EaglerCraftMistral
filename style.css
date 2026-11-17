@@ -45,6 +45,8 @@ html, body {
   overflow-y: auto;
 }
 
+#hint { pointer-events: none; background: transparent; }
+
 .panel.small { pointer-events: none; background: rgba(0, 0, 0, 0.35); }
 
 h1 {
