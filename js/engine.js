@@ -8,7 +8,8 @@
   const AIR = 0, GRASS = 1, DIRT = 2, STONE = 3, SAND = 4, LOG = 5, LEAVES = 6,
         WATER = 7, PLANKS = 8, COBBLE = 9, GLASS = 10, BRICK = 11, BEDROCK = 12,
         SNOW = 13, GRAVEL = 14, WOOL = 15, COAL_ORE = 16, IRON_ORE = 17,
-        TABLE = 18, TORCH = 19;
+        TABLE = 18, TORCH = 19,
+        FLOWER_RED = 20, FLOWER_YELLOW = 21, TALLGRASS = 22;
 
   const BLOCKS = {
     [GRASS]:    { name: 'Herbe',            top: 0,  bottom: 2,  side: 1,  opaque: true,  solid: true },
@@ -29,7 +30,10 @@
     [COAL_ORE]: { name: 'Minerai de charbon', top: 16, bottom: 16, side: 16, opaque: true, solid: true },
     [IRON_ORE]: { name: 'Minerai de fer',   top: 17, bottom: 17, side: 17, opaque: true,  solid: true },
     [TABLE]:    { name: 'Établi',           top: 18, bottom: 9,  side: 19, opaque: true,  solid: true },
-    [TORCH]:    { name: 'Torche',           top: 20, bottom: 20, side: 20, opaque: false, solid: false, torch: true }
+    [TORCH]:    { name: 'Torche',           top: 20, bottom: 20, side: 20, opaque: false, solid: false, torch: true },
+    [FLOWER_RED]:    { name: 'Coquelicot',    top: 31, bottom: 31, side: 31, opaque: false, solid: false, plant: true },
+    [FLOWER_YELLOW]: { name: 'Pissenlit',     top: 32, bottom: 32, side: 32, opaque: false, solid: false, plant: true },
+    [TALLGRASS]:     { name: 'Herbe haute',   top: 33, bottom: 33, side: 33, opaque: false, solid: false, plant: true }
   };
 
   for (let l = 8; l >= 1; l--) {
@@ -60,6 +64,20 @@
 
   function smooth(t) { return t * t * (3 - 2 * t); }
 
+  function noise3(x, y, z, s) {
+    const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+    const xf = x - xi, yf = y - yi, zf = z - zi;
+    const u = smooth(xf), v = smooth(yf), w = smooth(zf);
+    const c000 = hash3(xi, yi, zi, s), c100 = hash3(xi + 1, yi, zi, s);
+    const c010 = hash3(xi, yi + 1, zi, s), c110 = hash3(xi + 1, yi + 1, zi, s);
+    const c001 = hash3(xi, yi, zi + 1, s), c101 = hash3(xi + 1, yi, zi + 1, s);
+    const c011 = hash3(xi, yi + 1, zi + 1, s), c111 = hash3(xi + 1, yi + 1, zi + 1, s);
+    const x00 = c000 + (c100 - c000) * u, x10 = c010 + (c110 - c010) * u;
+    const x01 = c001 + (c101 - c001) * u, x11 = c011 + (c111 - c011) * u;
+    const y0 = x00 + (x10 - x00) * v, y1 = x01 + (x11 - x01) * v;
+    return y0 + (y1 - y0) * w;
+  }
+
   function noise2(x, y, s) {
     const xi = Math.floor(x), yi = Math.floor(y);
     const xf = x - xi, yf = y - yi;
@@ -80,6 +98,33 @@
     return sum / norm;
   }
 
+  function fbm3(x, y, z, s, octaves) {
+    let amp = 1, freq = 1, sum = 0, norm = 0;
+    for (let i = 0; i < octaves; i++) {
+      sum += amp * noise3(x * freq, y * freq, z * freq, (s + i * 1013) | 0);
+      norm += amp;
+      amp *= 0.5;
+      freq *= 2;
+    }
+    return sum / norm;
+  }
+
+  function biomeAt(wx, wz) {
+    const m = fbm(wx * 0.0038, wz * 0.0038, (SEED ^ 0xB10) | 0, 2);
+    if (m < 0.36) return 'desert';
+    if (m > 0.64) return 'snow';
+    if (m > 0.55) return 'forest';
+    return 'plains';
+  }
+
+  function caveAt(wx, y, wz) {
+    if (y < 5) return false;
+    const a = fbm3(wx * 0.042, y * 0.06, wz * 0.042, (SEED ^ 0xCAFE) | 0, 2);
+    if (Math.abs(a - 0.5) > 0.055) return false;
+    const b = fbm3(wx * 0.042, y * 0.06, wz * 0.042, (SEED ^ 0xF00D) | 0, 2);
+    return Math.abs(b - 0.5) < 0.055;
+  }
+
   function terrainHeight(wx, wz) {
     const e = fbm(wx * 0.0075, wz * 0.0075, SEED, 4);
     const d = fbm(wx * 0.045, wz * 0.045, (SEED ^ 0x9e3779) | 0, 2);
@@ -87,9 +132,11 @@
     return Math.max(2, Math.min(WORLD_H - 12, Math.floor(h)));
   }
 
-  function surfaceBlock(h) {
+  function surfaceBlock(wx, wz, h) {
     if (h <= WATER_LEVEL + 1) return SAND;
-    if (h >= 45) return SNOW;
+    const biome = biomeAt(wx, wz);
+    if (biome === 'desert') return SAND;
+    if (biome === 'snow' || h >= 45) return SNOW;
     return GRASS;
   }
 
@@ -102,7 +149,10 @@
   function treeAt(wx, wz) {
     const h = terrainHeight(wx, wz);
     if (h <= WATER_LEVEL + 1 || h >= 44) return false;
-    return hash2(wx, wz, (SEED ^ 0x51ab) | 0) < 0.012;
+    const biome = biomeAt(wx, wz);
+    if (biome === 'desert') return false;
+    const chance = biome === 'forest' ? 0.05 : (biome === 'snow' ? 0.004 : 0.012);
+    return hash2(wx, wz, (SEED ^ 0x51ab) | 0) < chance;
   }
 
   function blockIndex(x, y, z) { return y * 256 + z * 16 + x; }
@@ -168,9 +218,11 @@
     CHUNK, WORLD_H, WATER_LEVEL, ATLAS_COLS,
     AIR, GRASS, DIRT, STONE, SAND, LOG, LEAVES, WATER, PLANKS, COBBLE,
     GLASS, BRICK, BEDROCK, SNOW, GRAVEL, WOOL, COAL_ORE, IRON_ORE, TABLE, TORCH,
+    FLOWER_RED, FLOWER_YELLOW, TALLGRASS,
     BLOCKS, FACES,
     setSeed, getSeed, hash2, hash3, noise2, fbm,
     terrainHeight, surfaceBlock, oreAt, treeAt, blockIndex, faceVisible, raycast,
+    biomeAt, caveAt, noise3, fbm3,
     isWater, waterLevel, isSolid
   };
 })(typeof window !== 'undefined' ? window : globalThis);

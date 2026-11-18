@@ -1,75 +1,95 @@
-# WebCraft ⛏️
+# WebCraft — un clone de Minecraft dans le navigateur
 
-Un clone de Minecraft qui tourne entièrement dans votre navigateur.
-Aucun serveur, aucune installation : ouvrez `index.html` ou déployez le dossier tel quel.
+Jeu voxel type **Minecraft 1.14** (inspiré d'Eaglercraft), 100 % fait main en JavaScript,
+aucune dépendance à installer : Three.js r128 est vendu dans le dépôt. C'est un site
+100 % statique — déployable tel quel sur Vercel (ou Netlify, GitHub Pages…).
 
-## Fonctionnalités
+## Jouer en ligne
 
-- 🌍 Monde infini procédural (collines, plages, neige, arbres, lacs) avec minerais de charbon et de fer
-- 🎮 **Deux modes de jeu** :
-  - **Survie** : vie, délai de minage selon la dureté du bloc, dégâts de chute, régénération, mort et réapparition
-  - **Créatif** : blocs infinis, casse instantanée, aucun dégât, vol (touche F)
-- ⏱️ Minage réaliste : maintenez le clic gauche, une barre de progression s'affiche (les feuilles cassent vite, la pierre plus lentement, le minerai de fer encore plus)
-- 🐖 Animaux (cochons, moutons) le jour · 🧟 zombies la nuit (ils brûlent au lever du soleil)
-- ⚔️ Combat : épées en bois et en fer, attaque au clic gauche
-- 🎒 Inventaire complet (36 emplacements) avec molette, chiffres 1-9 et pile au curseur
-- 🛠️ Craft : 2×2 dans l'inventaire (touche E), 3×3 sur un établi
-- 🔥 Torches qui éclairent vraiment la nuit
-- 💧 Eau dynamique qui coule quand vous creusez
-- 🍖 Nourriture : mangez du porc ou du mouton pour vous soigner
-- 🖥️ Écran F3 détaillé (FPS, position, bloc visé, heure, mobs, mode, salon…)
-- 💾 Monde sauvegardé automatiquement dans le navigateur (localStorage)
-- 🌐 **Multijoueur** jusqu'à ~10 joueurs par salon (voir ci-dessous)
+1. Télécharge le zip du dépôt (Code → Download ZIP) ou `git clone`.
+2. Sur [vercel.com](https://vercel.com) : Import Project → glisse le dossier
+   (ou `vercel deploy`). Aucune configuration : `index.html` à la racine, c'est tout.
+3. Chaque push redéploie automatiquement le site.
 
-## Multijoueur
+Lancer en local : double-cliquez `index.html` ou `npx serve .`
 
-Le multijoueur passe par un relais MQTT public (`wss://broker.emqx.io`), donc **une connexion internet est requise** — mais aucun serveur à installer.
+## Mode de jeu
 
-1. Le premier joueur choisit **Héberger** : un code de salon à 5 caractères est généré. Son monde (seed + modifications) fait autorité.
-2. Il partage le code avec ses amis.
-3. Les autres joueurs entrent leur pseudo et le code, puis cliquent **Rejoindre**.
-4. Tout est synchronisé : blocs posés/cassés, position des joueurs, mobs, heure du jour, chat (touche **T**).
+- **Survie** : délai de minage selon le bloc et l'outil, vie, faim/exhaustion,
+  dégâts de chute, mobs hostiles la nuit, XP.
+- **Créatif** : minage instantané, vol (double Espace ou F), inventaire prérempli,
+  pas de dégâts.
 
-Notes :
-- L'hébergeur gère la simulation (eau, zombies, apparition des mobs) ; les invités reçoivent le résultat.
-- Les invités ne sauvegardent pas le monde localement.
-- Si l'hébergeur quitte, le salon se ferme.
+## Contenu (fidélité MC 1.14)
 
-## Boucle de jeu
+**Monde**
+- Génération procédurale par graine (champ « Graine »), collines, plages,
+  océans avec eau animée qui coule, étage de bedrock irrégulier.
+- **Grottes** creusées par double bruit 3D (densité proche du vrai MC).
+- **4 biomes** : plaines, forêt (arbres denses), désert (sans arbres),
+  neige — herbes hautes et fleurs (coquelicot, pissenlit) en croix dans les plaines/forêts.
+- Sable et gravier **tombent** s'ils ne sont pas soutenus.
+- Minerais : charbon, fer (le fer exige une pioche en fer pour être récupéré).
+- **Torches** qui éclairent réellement la zone (lumière bloquée
+  par les murs), ciel qui change (aube/jour/crépuscule/nuit), étoiles, **nuages qui dérivent**.
 
-1. Cassez des arbres à la main → bûches
-2. Craft : 1 bûche → 4 planches, 2 planches → 4 bâtons
-3. 4 planches en carré → établi → posez-le et clic droit pour le craft 3×3
-4. Minez du charbon → torches (charbon + bâton)
-5. Le soir, les zombies arrivent : fabriquez une épée et abritez-vous !
-6. Tuez cochons/moutons pour manger et récupérer de la laine
+**Rendu**
+- Éclairage lisse avec **occlusion ambiante** aux coins (comme le « Smooth Lighting » de MC).
+- Brouillard par distance (réglable dans le menu : 2 à 6 chunks).
+- **Particules** colorées à la casse d'un bloc.
+- **Objet tenu en vue subjective** avec animation de frappe, **vibrations de marche**
+  et **FOV élargi en sprint**.
+- Surbrillance du bloc visé, portée 6 blocs.
 
-## Contrôles
+**Survie**
+- **Faim** : marcher/sprinter/sauter coûte de l'épuisement ; sprint bloqué sous 9 points;
+  mangée de la chair de porc/mouton pour récupérer ; la famine fait perdre de la vie
+  (min. 1) ; la régénération mange de la faim (≥ 18 points).
+- Barres de vie ❤ et de faim 🍗 au-dessus de la barre rapide, **barre d'XP** verte
+  avec niveau.
+- **XP** : minerais de charbon/fer, mobs tués.
+- Sons par matériau (pierre/bois/verre/terre), **bruits de pas**, plouf dans l'eau,
+  grognements de zombie, **sifflement du creeper**, son de niveau.
+
+**Mobs**
+- Cochons et moutons (viande + laine) le jour, **zombies, squelettes (tirent des flèches)
+  et creepers (explosion destructrice)** la nuit.
+- Les zombies brûlent au soleil, les mobs apparaissent/disparaissent selon la distance.
+
+**Inventaire & craft**
+- Inventaire 36 slots (touche **E**), barre rapide 9 slots (molette ou touches 1-9).
+- Craft 2×2 à la main, **table de craft 3×3** (planche ×4).
+- Recettes : planches, bâtons, torche, verre, pierre taillée, **table de craft**,
+  épée en bois, **pioche en bois et en fer** (indispensables pour la pierre et le fer).
+- Les blocs cassés se remettent dans l'inventaire ; le monde sauvegarde vos
+  modifications automatiquement (localStorage, par graine).
+
+## Commandes
 
 | Touche | Action |
 |---|---|
-| ZQSD / WASD | Se déplacer |
-| Espace | Sauter / nager |
+| ZQSD / WASD | Se déplacer (détection auto) |
+| Souris | Regarder / viser |
+| Clic gauche (maintenu) | Miner (barre de progression en survie) |
+| Clic droit | Poser un bloc / manger |
+| Espace | Sauter (×2 : vol en créatif) |
 | Maj | Sprinter |
-| Clic gauche | Casser un bloc (maintenir en survie) / attaquer |
-| Clic droit | Poser un bloc / manger / ouvrir un établi |
-| Molette / 1-9 | Changer d'objet |
-| E | Inventaire (craft 2×2) |
-| T | Chat (en multijoueur) |
-| F | Voler (créatif) |
-| F3 | Infos de debug |
+| E | Inventaire |
+| F | Vol (créatif) |
+| 1-9 / molette | Barre rapide |
+| F3 | Infos de debug (biome, coordonnés, FPS, faim…) |
 | Échap | Pause |
-
-## Déployer sur Vercel
-
-1. `npm i -g vercel` (ou via le site vercel.com)
-2. Dans ce dossier : `vercel --prod`
-3. Ou importez le dossier/zip dans Vercel : framework **Other**, aucun réglage nécessaire (site 100 % statique)
 
 ## Technique
 
-- Three.js r128 et MQTT.js 4.3.7 inclus localement (`js/`), aucun CDN
-- `js/engine.js` : logique pure (bruit, terrain, raycast) — testable sous Node
-- `js/game.js` : rendu, physique, modes, minage, inventaire, mobs, eau, ciel, réseau
-- Multijoueur : salons héberge-autoritaires via MQTT over WSS, messages JSON (`hello`/`welcome`/`pos`/`blocks`/`mobs`/`time`/`chat`/`hurt`/`give`/`bye`)
-- Atlas de textures généré procéduralement au démarrage (aucune image)
+- `js/engine.js` — génération de terrain, bruits (2D/3D), biomes, grottes,
+  raycast, helper de faces : pur, sans rendu (expose `WebCraftEngine`).
+- `js/game.js` — rendu, physique, mobs, faim, XP, sons, UI (expose `WebCraftDebug`).
+- `js/three.min.js` — Three.js r128 (vendu, aucune installation).
+- Aucune build, aucun serveur : fichiers statiques.
+
+## Vérification
+
+Suite de tests sans navigateur : `node /tmp/smoke.js` (harnais à reconstituer via
+VM Node) — 42 contrôles : moteur, grottes, biomes, craft, minage/délais, drops,
+faim/regen, explosions, squelettes/flèches, XP, sable, jour/nuit, mobs, particules.
