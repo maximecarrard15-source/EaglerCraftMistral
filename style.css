@@ -378,3 +378,76 @@ input, select {
 #item-tip{position:fixed;display:block;background:rgba(14,2,20,.94);color:#fff;padding:4px 9px;font-size:13px;
   border:2px solid #2d0a63;outline:1px solid #0f0f12;pointer-events:none;z-index:60;white-space:nowrap;font-family:inherit;}
 #item-tip.hidden{display:none;}
+
+/* ===== v5 : multijoueur + pancartes ===== */
+#mp-box {
+  border-top: 2px solid #3a2a1a;
+  margin-top: 14px;
+  padding-top: 10px;
+  text-align: center;
+}
+#mp-box .mp-title {
+  font-weight: bold;
+  color: #ffd83d;
+  margin-bottom: 8px;
+}
+#mp-box .mp-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+#mp-box .mc-btn.small {
+  font-size: 13px;
+  padding: 8px 12px;
+  width: auto;
+}
+#room-code {
+  width: 90px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  font-weight: bold;
+}
+#net-status {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #9fe89f;
+}
+#net-status.error { color: #ff7a7a; }
+
+/* lecteur de pancarte visee */
+#sign-read {
+  position: fixed;
+  left: 50%;
+  bottom: 22%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.72);
+  border: 2px solid #54421f;
+  color: #ffe9b0;
+  font-size: 16px;
+  padding: 8px 16px;
+  max-width: 70vw;
+  pointer-events: none;
+  z-index: 40;
+}
+#sign-read.hidden { display: none !important; }
+
+/* editeur de pancarte */
+#sign-edit input[type="text"] {
+  width: 100%;
+  margin: 10px 0;
+  padding: 8px;
+  font-size: 15px;
+  background: #0e0e0e;
+  color: #fff;
+  border: 2px solid #565656;
+}
+#sign-edit .mp-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+@media (max-width: 700px) {
+  #mp-box .mp-row { flex-wrap: wrap; }
+}

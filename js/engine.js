@@ -10,7 +10,8 @@
         SNOW = 13, GRAVEL = 14, WOOL = 15, COAL_ORE = 16, IRON_ORE = 17,
         TABLE = 18, TORCH = 19,
         FLOWER_RED = 20, FLOWER_YELLOW = 21, TALLGRASS = 22,
-        BED = 23, CHEST = 24, FURNACE = 25;
+        BED = 23, CHEST = 24, FURNACE = 25,
+        DOOR_L = 26, DOOR_U = 27, SIGN = 28;
 
   const BLOCKS = {
     [GRASS]:    { name: 'Herbe',            top: 0,  bottom: 2,  side: 1,  opaque: true,  solid: true },
@@ -37,7 +38,10 @@
     [TALLGRASS]:     { name: 'Herbe haute',   top: 33, bottom: 33, side: 33, opaque: false, solid: false, plant: true },
     [BED]:           { name: 'Lit',           top: 34, bottom: 35, side: 35, opaque: false, solid: false, bed: true, half: true },
     [FURNACE]:  { name: 'Four',             top: 39, bottom: 39, side: 41, opaque: true, solid: true, furnace: true },
-    [CHEST]:         { name: 'Coffre',        top: 37, bottom: 36, side: 36, opaque: true,  solid: true, chest: true }
+    [CHEST]:         { name: 'Coffre',        top: 37, bottom: 36, side: 36, opaque: true,  solid: true, chest: true },
+    [DOOR_L]:   { name: 'Porte',         top: 46, bottom: 46, side: 46, opaque: false, solid: true,  door: true, lower: true },
+    [DOOR_U]:   { name: 'Porte',         top: 47, bottom: 47, side: 47, opaque: false, solid: true,  door: true, upper: true },
+    [SIGN]:     { name: 'Pancarte',      top: 48, bottom: 48, side: 48, opaque: false, solid: false, sign: true }
   };
 
   for (let l = 8; l >= 1; l--) {
@@ -222,7 +226,7 @@
     CHUNK, WORLD_H, WATER_LEVEL, ATLAS_COLS,
     AIR, GRASS, DIRT, STONE, SAND, LOG, LEAVES, WATER, PLANKS, COBBLE,
     GLASS, BRICK, BEDROCK, SNOW, GRAVEL, WOOL, COAL_ORE, IRON_ORE, TABLE, TORCH,
-    FLOWER_RED, FLOWER_YELLOW, TALLGRASS, BED, CHEST, FURNACE,
+    FLOWER_RED, FLOWER_YELLOW, TALLGRASS, BED, CHEST, FURNACE, DOOR_L, DOOR_U, SIGN,
     BLOCKS, FACES,
     setSeed, getSeed, hash2, hash3, noise2, fbm,
     terrainHeight, surfaceBlock, oreAt, treeAt, blockIndex, faceVisible, raycast,

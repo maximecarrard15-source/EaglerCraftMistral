@@ -68,11 +68,21 @@
     </label>
     <button id="btn-solo" class="mc-btn">Jouer en solo</button>
     <button id="btn-reset" class="mc-btn secondary">Nouveau monde (efface la sauvegarde)</button>
+    <div id="mp-box">
+      <p class="mp-title">Multijoueur</p>
+      <div class="mp-row">
+        <button id="btn-host" class="mc-btn small">Créer un salon</button>
+        <input id="room-code" type="text" placeholder="CODE" maxlength="5" autocomplete="off" />
+        <button id="btn-join" class="mc-btn small">Rejoindre</button>
+      </div>
+      <div id="net-status" class="hidden"></div>
+    </div>
     <div class="controls">
-      <p><b>ZQSD / WASD</b> se déplacer · <b>Espace</b> sauter / nager · <b>Maj</b> sprinter</p>
+      <p><b>ZQSD / WASD</b> se déplacer · <b>Espace</b> sauter / nager · <b>R</b> sprinter</p>
       <p><b>Clic gauche</b> miner (maintenir) / attaquer · <b>Clic droit</b> poser / manger / établi</p>
       <p><b>E</b> inventaire (craft 2×2) · <b>Molette / 1-9</b> sélection · <b>F</b> voler (créatif)</p>
-      <p><b>F3</b> infos détaillées · <b>Échap</b> pause</p>
+      <p><b>F3</b> infos détaillées · <b>M</b> musique on/off · <b>Échap</b> pause</p>
+      <p><b>Clic droit</b> sur une <b>porte</b> pour l'ouvrir · sur une <b>pancarte</b> pour écrire · <b>seau</b> sur une vache pour traire</p>
     </div>
     <p class="footer">100 % local — le monde est sauvegardé dans votre navigateur</p>
   </div>
@@ -110,8 +120,20 @@
 </div>
 
 <script src="js/three.min.js"></script>
+<script src="js/mqtt.min.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/game.js"></script>
+<div id="sign-read" class="hidden"></div>
+<div id="sign-edit" class="overlay hidden">
+  <div class="panel small">
+    <h2>Pancarte</h2>
+    <input id="sign-text" type="text" maxlength="60" placeholder="Écris ton texte…" autocomplete="off" />
+    <div class="mp-row">
+      <button id="sign-ok" class="mc-btn small">Valider</button>
+      <button id="sign-cancel" class="mc-btn small secondary">Annuler</button>
+    </div>
+  </div>
+</div>
 <div id="item-tip" class="hidden"></div>
 <div id="sleep-fade"></div>
 <div id="toast"></div>

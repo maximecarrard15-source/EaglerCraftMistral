@@ -49,7 +49,10 @@ Lancer en local : double-cliquez `index.html` ou `npx serve .`
   avec niveau.
 - **XP** : minerais de charbon/fer, mobs tués.
 - Sons par matériau (pierre/bois/verre/terre), **bruits de pas**, plouf dans l'eau,
-  grognements de zombie, **sifflement du creeper**, son de niveau.
+  grognements de zombie, meuglement des vaches, caquètements, creak des portes,
+  **sifflement du creeper**, son de niveau.
+- **Musique d'ambiance calme** (arpèges doux, touche **M** pour couper),
+  tonalité plus grave la nuit.
 
 **Mobs**
 - Cochons et moutons (viande + laine) le jour, **zombies, squelettes (tirent des flèches)
@@ -59,6 +62,20 @@ Lancer en local : double-cliquez `index.html` ou `npx serve .`
   peints à la main (groin du cochon, camo du creeper, orbites du squelette), zombie
   aux bras tendus, squelette qui tient son arc.
 - Les **squelettes lâchent des flèches** à leur mort (comme dans MC).
+
+**Animaux domestiques & nourriture**
+- **Vaches** (la journée) : lâchent du bœuf cru, cuisable en **steak**.
+  **Traite** : clic droit avec un **seau** → seau de lait, qui restaure toute la faim
+  et rend 4 cœurs (le seau revient vide).
+- **Poules** : lâchent des **œufs** — jette-les au clic droit !
+- Recettes : porte = 6 planches (2 colonnes), pancarte = 6 planches + bâton,
+  seau = 3 lingots de fer en V.
+
+**Portes & pancartes**
+- **Portes en bois** : posez-les (elles occupent 2 blocs), clic droit pour
+  ouvrir/fermer — le panneau pivote et on peut passer. Recette : 6 planches → 3 portes.
+- **Pancartes** : posez-en une, écrivez votre texte (jusqu'à 60 caractères),
+  il reste affiché quand vous visez la pancarte. Clic droit pour modifier.
 
 **Combat**
 - **Arc** : maintenez le clic droit pour bander l'arc, relâchez pour tirer — les
@@ -107,12 +124,24 @@ Lancer en local : double-cliquez `index.html` ou `npx serve .`
 | Clic gauche (maintenu) | Miner (barre de progression en survie) |
 | Clic droit | Poser un bloc / manger |
 | Espace | Sauter (×2 : vol en créatif) |
-| Maj | Sprinter |
+| R | Sprinter |
 | E | Inventaire |
 | F | Vol (créatif) |
 | 1-9 / molette | Barre rapide |
+| M | Musique on/off |
 | F3 | Infos de debug (biome, coordonnés, FPS, faim…) |
 | Échap | Pause |
+
+## Multijoueur
+
+- Menu principal → **Créer un salon** : un code à 5 caractères est généré,
+  partage-le avec tes amis.
+- Ou **Rejoindre** avec le code. Les mondes sont synchronisés par le broker
+  public MQTT (broker.emqx.io, chiffré wss) : blocs, positions, avatars colorés — mode et heure du jour partagés.
+- Le multijoueur est **entièrement facultatif** : le bouton « Jouer en solo »
+  n'y touche jamais — si le serveur est injoignable, le solo fonctionne
+  toujours normalement.
+- Le salon ferme la connexion quand l'hôte quitte (pas de serveur à payer).
 
 ## Technique
 
@@ -136,8 +165,10 @@ a été recréé de zéro pixel par pixel en reprenant les codes visuels emblém
 ## Vérification
 
 Suite de tests sans navigateur : `node /tmp/smoke.js` (harnais VM Node) —
-52 contrôles : moteur, grottes, biomes, craft, minage/délais, drops, faim/regen,
+78 contrôles : moteur, grottes, biomes, craft, minage/délais, drops, faim/regen,
 explosions, squelettes/flèches, XP, sable, jour/nuit, mobs, particules,
 sortie d'eau, lit/dormir, armure, coffres persistants, villages,
-**four (fabrication, fusion, jauges), infobulle des noms, arc (tir, dégâts,
-kill avec butin et XP), flèches des squelettes**.
+four (fabrication, fusion, jauges), infobulle des noms, arc (tir, dégâts,
+kill avec butin et XP), flèches des squelettes,
+**portes (craft, pose en paire, ouverture/collision), pancartes (texte),
+vaches/poules, seau/lait/œufs lançables, sprint sur R, multijoueur isolé**.

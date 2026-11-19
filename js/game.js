@@ -10,7 +10,8 @@
         WOOL = E.WOOL, COAL_ORE = E.COAL_ORE, IRON_ORE = E.IRON_ORE,
         TABLE = E.TABLE, TORCH = E.TORCH,
         FLOWER_RED = E.FLOWER_RED, FLOWER_YELLOW = E.FLOWER_YELLOW, TALLGRASS = E.TALLGRASS,
-        BED = E.BED, CHEST = E.CHEST, FURNACE = E.FURNACE;
+        BED = E.BED, CHEST = E.CHEST, FURNACE = E.FURNACE,
+        DOOR_L = E.DOOR_L, DOOR_U = E.DOOR_U, SIGN = E.SIGN;
 
   const ITEMS = {
     100: { name: 'Charbon', tile: 22, fuel: 8 },
@@ -26,7 +27,12 @@
     110: { name: 'Porc cuit', tile: 44, food: 8 },
     111: { name: 'Mouton cuit', tile: 45, food: 6 },
     112: { name: 'Flèche', tile: 42 },
-    113: { name: 'Arc', tile: 43, bow: true, maxStack: 1 }
+    113: { name: 'Arc', tile: 43, bow: true, maxStack: 1 },
+    114: { name: 'Bœuf cru', tile: 53, food: 3 },
+    115: { name: 'Steak', tile: 54, food: 8 },
+    116: { name: 'Seau', tile: 55, maxStack: 1 },
+    117: { name: 'Seau de lait', tile: 56, milk: true, maxStack: 1 },
+    118: { name: 'Œuf', tile: 57, egg: true, maxStack: 16 }
   };
 
   function trimShape(shape) {
@@ -54,10 +60,13 @@
     { shape: [[105, null, 105], [105, 105, 105], [105, 105, 105]], out: { id: 109, count: 1 } },
     { shape: [[COBBLE, COBBLE, COBBLE], [COBBLE, 0, COBBLE], [COBBLE, COBBLE, COBBLE]], out: { id: FURNACE, count: 1 } },
     { shape: [[0, 101, WOOL], [0, 101, 0], [0, 101, WOOL]], out: { id: 113, count: 1 } },
-    { shape: [[GRAVEL], [101], [WOOL]], out: { id: 112, count: 4 } }
+    { shape: [[GRAVEL], [101], [WOOL]], out: { id: 112, count: 4 } },
+    { shape: [[PLANKS, PLANKS], [PLANKS, PLANKS], [PLANKS, PLANKS]], out: { id: DOOR_L, count: 3 } },
+    { shape: [[PLANKS, PLANKS, PLANKS], [PLANKS, PLANKS, PLANKS], [null, 101, null]], out: { id: SIGN, count: 3 } },
+    { shape: [[105, 0, 105], [0, 105, 0]], out: { id: 116, count: 1 } }
   ].map((r) => ({ rows: trimShape(r.shape).map((row) => row.map((c) => c || 0)), out: r.out }));
 
-  const SMELT = { [IRON_ORE]: 105, [SAND]: GLASS, [COBBLE]: STONE, 103: 110, 104: 111 };
+  const SMELT = { [IRON_ORE]: 105, [SAND]: GLASS, [COBBLE]: STONE, 103: 110, 104: 111, 114: 115 };
   const FUEL = { 100: 8, [LOG]: 1.5, [PLANKS]: 1.5, 101: 0.5, [WOOL]: 0.25 };
 
   const GRAVITY = 30, JUMP_V = 8.8, WALK_SPEED = 4.4, SPRINT_MULT = 1.55,
@@ -628,6 +637,83 @@
       }
       return [0, 0, 0, 0];
     });
+    // --- porte / pancarte ---
+    tile(46, (x, y, r) => { // porte basse : cadre bois + panneau creux
+      const m = n(9, r);
+      const edge = x === 0 || x === 15 || y === 0 || y === 15;
+      if (edge) return [96 + m, 68 + m, 38 + m];
+      if (x >= 6 && x <= 9 && y >= 5 && y <= 12) {
+        const win = (x > 6 && x < 9 && y > 6 && y < 11);
+        return win ? [70 + m, 90 + m, 110 + m] : [96 + m, 68 + m, 38 + m];
+      }
+      const plank = ((x + y * 2) % 5 === 0) ? -14 : 0;
+      return [150 + plank + m, 108 + plank + m, 60 + plank + m];
+    });
+    tile(47, (x, y, r) => { // porte haute : panneau plein
+      const m = n(9, r);
+      const edge = x === 0 || x === 15 || y === 0 || y === 15;
+      if (edge) return [96 + m, 68 + m, 38 + m];
+      if (x > 6 && x < 9 && y > 2 && y < 13) return [110 + m, 78 + m, 44 + m,];
+      const plank = ((x * 3 + y) % 5 === 0) ? -13 : 0;
+      return [150 + plank + m, 108 + plank + m, 60 + plank + m];
+    });
+    tile(48, (x, y, r) => { // pancarte : planche sur poteau
+      if (x >= 7 && x <= 8 && y >= 9 && y <= 15) { const m = n(8, r); return [104 + m, 78 + m, 44 + m]; }
+      if (y >= 2 && y <= 8 && x >= 1 && x <= 14) {
+        if (x === 1 || x === 14 || y === 2 || y === 8) { const m = n(7, r); return [92 + m, 66 + m, 36 + m]; }
+        const m = n(10, r);
+        return [168 + m, 128 + m, 76 + m];
+      }
+      return [0, 0, 0, 0];
+    });
+    // --- items v5 : viande de boeuf, seau, lait, oeuf ---
+    tile(53, (x, y, r) => { // Boeuf cru
+      const dx = (x - 8) / 5.4, dy = (y - 8) / 5.9;
+      if (dx * dx + dy * dy > 1) return [0, 0, 0, 0];
+      const m = n(8, r);
+      const ripple = (Math.sin((x + y) * 1.1) > 0.4) ? -22 : 0;
+      if (x < 6 && y > 10) return [236 + m, 228 + m, 214 + m];
+      return [186 + m + ripple, 70 + m + ripple, 66 + m + ripple];
+    });
+    tile(54, (x, y, r) => { // Steak
+      const dx = (x - 8) / 5.4, dy = (y - 8) / 5.9;
+      if (dx * dx + dy * dy > 1) return [0, 0, 0, 0];
+      const m = n(8, r);
+      const ripple = (Math.sin((x + y) * 1.1) > 0.4) ? -20 : 0;
+      if (x < 6 && y > 10) return [210 + m, 168 + m, 120 + m];
+      return [116 + m + ripple, 60 + m + ripple, 38 + m + ripple];
+    });
+    tile(55, (x, y, r) => { // Seau : anse + cuve grise
+      const ans = (y > 1 && y < 8 && Math.abs(x - 8) >= 4.6 && Math.abs(x - 8) <= 5.9 && Math.abs(Math.abs(x - 8) - (8 - Math.min(y, 8)) * 0.72) < 1.15);
+      const body = y >= 8;
+      if (body) {
+        const dx = Math.abs(x - 8) / 6.2 - 0.6;
+        if (y === 8 || y === 15 || Math.abs(x - 8) > 5.4) { const m = n(7, r); return [188 + m, 190 + m, 196 + m]; }
+        if (dx > -0.18) { const m = n(6, r); return [222 + m, 224 + m, 230 + m]; }
+        const m = n(8, r);
+        return [138 + m, 140 + m, 148 + m];
+      }
+      if (ans) { const m = n(6, r); return [198 + m, 200 + m, 208 + m]; }
+      return [0, 0, 0, 0];
+    });
+    tile(56, (x, y, r) => { // Seau de lait
+      const body = y >= 7;
+      if (body) {
+        if (y === 7 || y === 15 || Math.abs(x - 8) > 5.4) { const m = n(7, r); return [188 + m, 190 + m, 196 + m]; }
+        const m = n(7, r);
+        return [232 + m, 232 + m, 234 + m];
+      }
+      const ans = (y > 0 && y < 7 && Math.abs(Math.abs(x - 8) - (7 - y) * 0.78) < 1.05 && Math.abs(x - 8) >= 4.2);
+      if (ans) { const m = n(6, r); return [198 + m, 200 + m, 208 + m]; }
+      return [0, 0, 0, 0];
+    });
+    tile(57, (x, y, r) => { // Oeuf blanc casse-tache
+      const dx = (x - 8) / 4.4, dy = (y - 8.4) / 5.8;
+      if (dx * dx + dy * dy > 1) return [0, 0, 0, 0];
+      const m = n(7, r);
+      const spot = E.hash2(x, y, 995) < 0.13;
+      return spot ? [206 + m, 186 + m, 120 + m] : [238 + m, 230 + m, 204 + m];
+    });
     return cv;
   }
   function chunkKey(cx, cz) { return cx + ',' + cz; }
@@ -844,6 +930,8 @@
     const old = ch.data[idx];
     if (old === id) return;
     ch.data[idx] = id;
+    if (old === SIGN) signData.delete(x + ',' + y + ',' + z);
+    if (old === DOOR_L || old === DOOR_U) doorOpen.delete(doorLowerKeyAt(x, y, z, old));
     if (id === CHEST) {
       const ck = x + ',' + y + ',' + z;
       if (!chestData.has(ck)) chestData.set(ck, new Array(27).fill(null));
@@ -860,6 +948,7 @@
     if (record) {
       recordEdit(cx, cz, lx, y, lz, id);
       flushDirty();
+      if (netState.active) netOutBlock(x, y, z, id);
     }
   }
 
@@ -888,6 +977,7 @@
       const obj = JSON.parse(raw);
       for (const k in obj) editsByChunk.set(k, obj[k]);
     } catch (e) {}
+    loadSigns(seed);
   }
 
   function tickWater() {
@@ -1011,6 +1101,68 @@
     return ao;
   }
 
+  const doorOpen = new Set();
+  function doorLowerKeyAt(x, y, z, id) {
+    return x + ',' + (id === DOOR_U ? y - 1 : y) + ',' + z;
+  }
+  function isDoorOpenAt(x, y, z, id) {
+    return doorOpen.has(doorLowerKeyAt(x, y, z, id));
+  }
+  function pushQuad(t, pts, uvw, tileIdx, tl) {
+    const tcol = tileIdx % 8, trow = (tileIdx / 8) | 0;
+    for (const w of [pts, pts.slice().reverse()]) {
+      const base = t.pos.length / 3;
+      for (let i = 0; i < 4; i++) {
+        const c = w[i];
+        t.pos.push(x0q + c[0], y0q + c[1], z0q + c[2]);
+        t.uv.push((tcol + uvw[i][0]) / 8, 1 - (trow + 1 - uvw[i][1]) / 8);
+        t.shade.push(1, 1, 1);
+        t.torch.push(tl);
+      }
+      t.idx.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
+    }
+  }
+  let x0q = 0, y0q = 0, z0q = 0;
+
+  function pushDoor(t, x, y, z, id, tl, wx, wy, wz) {
+    const open = isDoorOpenAt(wx, wy, wz, id);
+    x0q = x; y0q = y; z0q = z;
+    if (!open) {
+      // fermee : panneau face au nord (plan z), epaisseur fine
+      pushQuad(t, [[0, 0, 0.86], [1, 0, 0.86], [1, 1, 0.86], [0, 1, 0.86]],
+        [[0, 0], [1, 0], [1, 1], [0, 1]], BLOCKS[id].side, tl);
+    } else {
+      // ouverte : panneau tourne contre le mur (plan x)
+      pushQuad(t, [[0.86, 0, 0], [0.86, 0, 1], [0.86, 1, 1], [0.86, 1, 0]],
+        [[0, 0], [1, 0], [1, 1], [0, 1]], BLOCKS[id].side, tl);
+    }
+  }
+
+  function pushSign(t, x, y, z, tileIdx, tl) {
+    x0q = x; y0q = y; z0q = z;
+    // poteau croise
+    pushQuad(t, [[0.42, 0, 0.42], [0.58, 0, 0.58], [0.58, 0.55, 0.58], [0.42, 0.55, 0.42]],
+      [[0.44, 0], [0.56, 0], [0.56, 0.55], [0.44, 0.55]], tileIdx, tl);
+    // planche avant/arriere
+    x0q = x; y0q = y; z0q = z;
+    {
+      const tcol = tileIdx % 8, trow = (tileIdx / 8) | 0;
+      const v0 = 1 - (trow + 1 - 0.42) / 8, v1 = 1 - (trow + 1 - 0.86) / 8;
+      const quad = [[0.06, 0.42, 0.5], [0.94, 0.42, 0.5], [0.94, 0.86, 0.5], [0.06, 0.86, 0.5]];
+      for (const w of [quad, quad.slice().reverse()]) {
+        const base = t.pos.length / 3;
+        const us = [[0, 0.42], [1, 0.42], [1, 0.86], [0, 0.86]];
+        for (let i = 0; i < 4; i++) {
+          t.pos.push(x + w[i][0], y + w[i][1], z + w[i][2]);
+          t.uv.push((tcol + us[i][0]) / 8, v0 + (v1 - v0) * us[i][1]);
+          t.shade.push(1, 1, 1);
+          t.torch.push(tl);
+        }
+        t.idx.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
+      }
+    }
+  }
+
   function pushCross(buf, x, y, z, tileIdx, tl) {
     const tcol = tileIdx % 8, trow = (tileIdx / 8) | 0;
     const q1 = [
@@ -1053,6 +1205,8 @@
           if (id === TORCH) { pushTorch(opq, x, y, z); continue; }
           const b = BLOCKS[id];
           if (b.plant) { pushCross(opq, x, y, z, b.side, torchLightAt(wx, y, wz)); continue; }
+          if (b.door) { pushDoor(opq, x, y, z, id, torchLightAt(wx, y, wz), wx, y, wz); continue; }
+          if (b.sign) { pushSign(opq, x, y, z, b.side, torchLightAt(wx, y, wz)); continue; }
           const isW = E.isWater(id);
           const t = isW ? wat : opq;
           let topH = 1;
@@ -1150,7 +1304,10 @@
       for (let z = z0; z <= z1; z++) {
         for (let x = x0; x <= x1; x++) {
           const id = getBlock(x, y, z);
-          if (id !== AIR && BLOCKS[id] && BLOCKS[id].solid) return true;
+          if (id !== AIR && BLOCKS[id] && BLOCKS[id].solid) {
+            if (BLOCKS[id].door && isDoorOpenAt(x, y, z, id)) continue;
+            return true;
+          }
         }
       }
     }
@@ -1175,8 +1332,8 @@
   }
 
   function updatePlayer(dt) {
-    const shift = keys.has('ShiftLeft') || keys.has('ShiftRight');
-    const sprint = shift && (player.fly || player.hunger > 6);
+    const rdown = keys.has('KeyR');
+    const sprint = rdown && (player.fly || player.hunger > 6);
     let speed = player.fly ? FLY_SPEED * (sprint ? 1.8 : 1) : WALK_SPEED * (sprint ? SPRINT_MULT : 1);
     if (player.inWater && !player.fly) speed *= 0.55;
     const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
@@ -1361,6 +1518,71 @@
     if (furnFlameEl) furnFlameEl.textContent = f.burn > 0 ? '\u{1F525}' : ' ';
   }
 
+  const signData = new Map();
+  let editingSignKey = null;
+
+  function toggleDoorAt(x, y, z, id) {
+    const lk = doorLowerKeyAt(x, y, z, id);
+    if (doorOpen.has(lk)) doorOpen.delete(lk);
+    else doorOpen.add(lk);
+    playSound(doorOpen.has(lk) ? 180 : 140, 0.16, 0.14, 'square');
+    const p = lk.split(',');
+    const ch = getChunk(Math.floor(+p[0] / CHUNK), Math.floor(+p[2] / CHUNK));
+    if (ch && ch.built) buildChunkMesh(ch);
+  }
+
+  function signEditElements() {
+    return { ov: document.getElementById('sign-edit'), inp: document.getElementById('sign-text'),
+      ok: document.getElementById('sign-ok'), no: document.getElementById('sign-cancel') };
+  }
+
+  function openSignEdit(x, y, z) {
+    editingSignKey = x + ',' + y + ',' + z;
+    const el = signEditElements();
+    if (!el.ov) return;
+    el.inp.value = signData.get(editingSignKey) || '';
+    signDataToSave = editingSignKey;
+    el.ov.classList.remove('hidden');
+    invOpen = true;
+    if (document.pointerLockElement === canvas) document.exitPointerLock();
+    setTimeout(() => { try { el.inp.focus(); } catch (err) {} }, 60);
+  }
+
+  let signDataToSave = null;
+
+  function closeSignEdit(save) {
+    const el = signEditElements();
+    if (!el.ov || signDataToSave === null) return;
+    if (save && editingSignKey) {
+      signData.set(editingSignKey, el.inp.value.slice(0, 60));
+      saveSigns();
+      playSound(340, 0.12, 0.1, 'triangle');
+    }
+    editingSignKey = null;
+    signDataToSave = null;
+    el.ov.classList.add('hidden');
+    invOpen = false;
+    if (gameState === 'playing' && !player.dead) canvas.requestPointerLock();
+  }
+
+  function saveSigns() {
+    try {
+      const obj = {};
+      for (const [k, v] of signData) obj[k] = v;
+      localStorage.setItem('webcraft_signs_' + E.getSeed(), JSON.stringify(obj));
+    } catch (e) {}
+  }
+
+  function loadSigns(seed) {
+    signData.clear();
+    try {
+      const raw = localStorage.getItem('webcraft_signs_' + seed);
+      if (!raw) return;
+      const obj = JSON.parse(raw);
+      for (const k in obj) signData.set(k, String(obj[k]));
+    } catch (e) {}
+  }
+
   function openChestAt(x, y, z) {
     const k = x + ',' + y + ',' + z;
     if (!chestData.has(k)) chestData.set(k, new Array(27).fill(null));
@@ -1543,8 +1765,7 @@
     const moving = Math.hypot(player.vel.x, player.vel.z) > 0.6;
     const wantBob = player.onGround && moving && !player.fly ? 1 : 0;
     bobAmt += (wantBob - bobAmt) * 0.12;
-    const sprintNow = moving && !player.fly &&
-      (keys.has('ShiftLeft') || keys.has('ShiftRight')) && player.hunger > 6;
+    const sprintNow = moving && !player.fly && keys.has('KeyR') && player.hunger > 6;
     const fovTarget = sprintNow ? 78 : 70;
     if (Math.abs(fovCur - fovTarget) > 0.05) {
       fovCur += (fovTarget - fovCur) * 0.14;
@@ -1622,6 +1843,16 @@
       hp: 6, speed: 1.9, hw: 0.3, hh: 1.9,
       body: 0xbfbfbf, head: 0xe4e4e4, leg: 0xa9a9a9,
       drops: [{ id: 112, min: 0, max: 2 }], xp: 5
+    },
+    cow: {
+      hp: 10, speed: 1.3, hw: 0.45, hh: 1.35,
+      body: 0x4a3728, head: 0x35251a, leg: 0x3a2a1e,
+      drops: [{ id: 114, min: 1, max: 2 }], xp: 2
+    },
+    chicken: {
+      hp: 4, speed: 1.5, hw: 0.21, hh: 0.72,
+      body: 0xe6e6e6, head: 0xf0f0f0, leg: 0xd8a13a,
+      drops: [{ id: 118, min: 0, max: 1 }], xp: 1
     }
   };
 
@@ -1709,6 +1940,34 @@
       return nz(x, y, 8, [204, 200, 190], 12);
     });
     MOBTEX.bowTex = tex8((x, y) => nz(x, y, 9, [118, 84, 44], 12));
+    MOBTEX.cowSkin = tex8((x, y) => {
+      const patch = Math.floor(E.hash2(x >> 1, y >> 1, 606) * 2);
+      if (patch) return nz(x, y, 11, [46, 34, 26], 14);
+      return nz(x, y, 12, [216, 210, 198], 12);
+    });
+    MOBTEX.cowFace = tex8((x, y) => {
+      if (y >= 5 && ((x === 0 || x === 7) && y <= 6)) return nz(x, y, 11, [46, 34, 26], 14);
+      if (y >= 4 && x >= 1 && x <= 6) {
+        if ((x === 1 && y >= 4 && y <= 5) || (x === 6 && y >= 4 && y <= 5)) return [20, 16, 18];
+        return nz(x, y, 13, [232, 176, 168], 10);
+      }
+      if ((x === 1 && y === 2) || (x === 6 && y === 2)) return [250, 250, 250];
+      if ((x === 1 && y === 3) || (x === 6 && y === 3)) return [30, 26, 30];
+      return nz(x, y, 12, [216, 210, 198], 12);
+    });
+    MOBTEX.cowLeg = tex8((x, y) => nz(x, y, 14, [88, 66, 48], 12));
+    MOBTEX.chSkin = tex8((x, y) => nz(x, y, 15, [238, 236, 226], 10));
+    MOBTEX.chFace = tex8((x, y) => {
+      if (y >= 4 && x >= 1 && x <= 6) {
+        if (x >= 3 && x <= 4 && y === 4) return [214, 150, 40]; // bec
+        if ((x === 1 || x === 6) && y >= 5 && y <= 6) return [214, 60, 60]; // caroncules
+        if ((x === 2 || x === 5) && y === 5) return [24, 20, 24];
+        return nz(x, y, 15, [238, 236, 226], 10);
+      }
+      return nz(x, y, 15, [238, 236, 226], 10);
+    });
+    MOBTEX.chComb = tex8((x, y) => nz(x, y, 16, [212, 62, 54], 14));
+    MOBTEX.chLeg = tex8((x, y) => nz(x, y, 17, [216, 161, 58], 12));
   })();
 
   function makeMobMesh(type) {
@@ -1761,6 +2020,21 @@
       part(0.24, 0.34, 0.24, T.creeperSkin, null, 0.14, 0.17, -0.22);
       part(0.24, 0.34, 0.24, T.creeperSkin, null, -0.14, 0.17, 0.22);
       part(0.24, 0.34, 0.24, T.creeperSkin, null, 0.14, 0.17, 0.22);
+    } else if (type === 'cow') {
+      part(0.78, 0.68, 1.2, T.cowSkin, null, 0, 0.9, 0.05);
+      part(0.55, 0.52, 0.5, T.cowSkin, T.cowFace, 0, 1.18, -0.72);
+      part(0.24, 0.56, 0.24, T.cowLeg, null, -0.24, 0.28, -0.38);
+      part(0.24, 0.56, 0.24, T.cowLeg, null, 0.24, 0.28, -0.38);
+      part(0.24, 0.56, 0.24, T.cowLeg, null, -0.24, 0.28, 0.44);
+      part(0.24, 0.56, 0.24, T.cowLeg, null, 0.24, 0.28, 0.44);
+    } else if (type === 'chicken') {
+      part(0.4, 0.42, 0.55, T.chSkin, null, 0, 0.52, 0.02);
+      part(0.26, 0.3, 0.26, T.chSkin, T.chFace, 0, 0.82, -0.3);
+      part(0.16, 0.12, 0.14, T.chComb, null, 0, 0.98, -0.3);
+      part(0.06, 0.34, 0.06, T.chSkin, null, -0.24, 0.62, 0.08, -0.5); // ailes
+      part(0.06, 0.34, 0.06, T.chSkin, null, 0.24, 0.62, 0.08, -0.5);
+      part(0.06, 0.3, 0.06, T.chLeg, null, -0.08, 0.15, 0);
+      part(0.06, 0.3, 0.06, T.chLeg, null, 0.08, 0.15, 0);
     } else { // squelette
       part(0.5, 0.5, 0.5, T.bone, T.skFace, 0, 1.72, 0);
       part(0.4, 0.75, 0.16, T.ribs, null, 0, 1.1, 0);
@@ -1858,8 +2132,12 @@
         m.moving = Math.random() < 0.6;
         m.yaw = Math.random() * Math.PI * 2;
       }
-      if ((m.type === 'pig' || m.type === 'sheep') && Math.random() < dt * 0.05) {
-        playSound(m.type === 'pig' ? 175 + Math.random() * 45 : 235 + Math.random() * 45, 0.3, 0.07, 'square');
+      if (m.type === 'pig' || m.type === 'sheep' || m.type === 'cow' || m.type === 'chicken') {
+        if (Math.random() < dt * 0.05) {
+          if (m.type === 'cow') playSound(85 + Math.random() * 22, 0.7, 0.09, 'sawtooth');
+          else if (m.type === 'chicken') playSound(640 + Math.random() * 120, 0.13, 0.07, 'square');
+          else playSound(m.type === 'pig' ? 175 + Math.random() * 45 : 235 + Math.random() * 45, 0.3, 0.07, 'square');
+        }
       }
     }
     const speed = m.moving ? m.def.speed : 0;
@@ -1901,6 +2179,20 @@
   }
 
   const arrows = [];
+  function throwEgg() {
+    const dir = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.14),
+      new THREE.MeshBasicMaterial({ color: 0xf1e6c8 }));
+    scene.add(mesh);
+    arrows.push({
+      pos: new THREE.Vector3(camera.position.x, camera.position.y, camera.position.z),
+      v: dir.multiplyScalar(19),
+      life: 4, mesh, from: 'player', dmg: 1, egg: true
+    });
+    arrows[arrows.length - 1].v.y += 2.2;
+    playSound(520, 0.1, 0.09, 'sine');
+  }
+
   function spawnArrow(shooter) {
     const dx = player.pos.x - shooter.pos.x, dy = (player.pos.y + 1.2) - (shooter.pos.y + 1.5),
           dz = player.pos.z - shooter.pos.z;
@@ -1935,7 +2227,7 @@
         scene.remove(a.mesh); arrows.splice(i, 1);
         continue;
       }
-      if (hitBlock && a.from === 'player' && Math.random() < 0.4) addItem(112, 1); // flèche parfois récupérée
+      if (hitBlock && !a.egg && a.from === 'player' && Math.random() < 0.4) addItem(112, 1); // flèche parfois récupérée
       if (a.from === 'player') {
         // balayage le long du déplacement de la frame (évite de traverser les mobs à grande vitesse)
         let hitM = null;
@@ -2023,7 +2315,7 @@
     if (Math.random() > (night ? 0.7 : 0.4)) return;
     const pool = night
       ? ['zombie', 'zombie', 'skeleton', 'skeleton', 'creeper', 'pig', 'sheep']
-      : ['pig', 'sheep'];
+      : ['pig', 'sheep', 'cow', 'cow', 'chicken'];
     const type = pool[(Math.random() * pool.length) | 0];
     let count = 0;
     for (const m of mobs) if (m.type === type) count++;
@@ -2399,6 +2691,7 @@
     [SNOW]: 0.6, [LOG]: 1.5, [PLANKS]: 1.5, [TABLE]: 1.5, [WOOL]: 1.0,
     [GLASS]: 0.5, [TORCH]: 0.1,
     [FLOWER_RED]: 0.05, [FLOWER_YELLOW]: 0.05, [TALLGRASS]: 0.05, [BED]: 0.2, [CHEST]: 1.6,
+    [DOOR_L]: 1.2, [DOOR_U]: 1.2, [SIGN]: 0.8,
     [STONE]: 2.4, [COBBLE]: 2.4, [BRICK]: 2.4,
     [COAL_ORE]: 2.8, [IRON_ORE]: 3.2, [FURNACE]: 3.5
   };
@@ -2430,6 +2723,10 @@
   function breakBlockAt(x, y, z, id, canDrop) {
     if (id === CHEST) spillChest(x, y, z);
     if (id === FURNACE) spillFurnace(x, y, z);
+    if (id === DOOR_L && getBlock(x, y + 1, z) === DOOR_U) applyBlock(x, y + 1, z, AIR, true);
+    if (id === DOOR_U && getBlock(x, y - 1, z) === DOOR_L) applyBlock(x, y - 1, z, AIR, true);
+    doorOpen.delete(doorLowerKeyAt(x, y, z, id));
+    if (id === SIGN) signData.delete(x + ',' + y + ',' + z);
     applyBlock(x, y, z, AIR, true);
     spawnBlockParticles(x, y, z, id);
     const bs = blockSound(id);
@@ -2529,6 +2826,32 @@
     } catch (err) {}
   }
 
+  // --- musique d'ambiance calme ---
+  let musicOn = true;
+  let musicTimer = 4;
+  const MUS_DAY = [[261.6, 329.6, 392.0], [220.0, 261.6, 329.6], [196.0, 246.9, 293.7], [174.6, 220.0, 261.6]];
+  const MUS_NIGHT = [[220.0, 261.6, 311.1], [196.0, 233.1, 293.7], [164.8, 196.0, 246.9], [185.0, 220.0, 277.2]];
+  let musicChord = 0;
+  function tickMusic(dt) {
+    if (!musicOn || gameState !== 'playing') return;
+    musicTimer -= dt;
+    if (musicTimer > 0) return;
+    musicTimer = 9 + Math.random() * 6;
+    const chords = dayLight < 0.4 ? MUS_NIGHT : MUS_DAY;
+    const ch = chords[musicChord % chords.length];
+    musicChord++;
+    const arp = [ch[0], ch[1], ch[2], ch[1], ch[0], ch[2], ch[1], ch[0]];
+    arp.forEach((f, i) => {
+      setTimeout(() => playSound(f * 2, 1.6, 0.018, 'sine'), i * 420);
+      setTimeout(() => playSound(f, 1.6, 0.012, 'triangle'), i * 420);
+    });
+  }
+  function toggleMusic() {
+    musicOn = !musicOn;
+    showToast('Musique : ' + (musicOn ? 'ON' : 'OFF'));
+    return musicOn;
+  }
+
   function hashString(s) {
     let h = 2166136261;
     for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
@@ -2546,6 +2869,8 @@
   function dropFor(id, tool) {
     if (id === GRASS) return DIRT;
     if (id === TALLGRASS) return null;
+    if (id === DOOR_U) return DOOR_L;
+    if (id === DOOR_L) return DOOR_L;
     if (isStoneLike(id)) {
       if (!tool) return null;
       if (id === IRON_ORE && tool < 2.6) return null; // une pioche en bois suffit (comme MC)
@@ -2577,6 +2902,11 @@
     resetWorld();
     spawnPlayer();
     dayTime = 0.03;
+    if (guestStartDayTime !== null) {
+      dayTime = guestStartDayTime;
+      guestStartDayTime = null;
+      updateSky();
+    }
     player.hp = 20;
     player.dead = false;
     player.hurtCd = 0;
@@ -2594,7 +2924,7 @@
     if (gameMode === 'creative') {
       [GRASS, DIRT, STONE, SAND, LOG, LEAVES, PLANKS, COBBLE, GLASS, BRICK,
        SNOW, GRAVEL, WOOL, COAL_ORE, IRON_ORE, TABLE, TORCH,
-       FLOWER_RED, FLOWER_YELLOW, TALLGRASS, BED, CHEST, FURNACE].forEach((id, i) => {
+       FLOWER_RED, FLOWER_YELLOW, TALLGRASS, BED, CHEST, FURNACE, DOOR_L, SIGN].forEach((id, i) => {
         inv[i] = { id, count: 64 };
       });
       inv[22] = { id: 107, count: 1 };
@@ -2602,6 +2932,8 @@
       inv[24] = { id: 109, count: 1 };
       inv[25] = { id: 113, count: 1 };
       inv[26] = { id: 112, count: 64 };
+      inv[27] = { id: 116, count: 1 };
+      inv[28] = { id: 118, count: 16 };
     }
     xp = 0; xpLevel = 0;
     updateHealthUI();
@@ -2622,6 +2954,8 @@
     chestData.clear();
     furnaceData.clear();
     openFurnaceKey = null;
+    doorOpen.clear();
+    signData.clear();
     for (const ch of chunks.values()) unloadChunk(ch);
     chunks.clear();
     meshQueue = [];
@@ -2678,6 +3012,22 @@
     c.fillRect(0, 0, 16, 16);
     const url = 'url(' + cv.toDataURL() + ')';
     document.querySelectorAll('.dirt-bg').forEach((el) => { el.style.backgroundImage = url; });
+  }
+
+  let signReadEl = null;
+  function updateSignRead() {
+    if (!signReadEl) signReadEl = document.getElementById('sign-read');
+    let text = null;
+    if (currentHit && gameState === 'playing' && !invOpen && !player.dead) {
+      const id = getBlock(currentHit.x, currentHit.y, currentHit.z);
+      if (id === SIGN) text = signData.get(currentHit.x + ',' + currentHit.y + ',' + currentHit.z) || null;
+    }
+    if (signReadEl) {
+      if (text) {
+        signReadEl.textContent = text;
+        signReadEl.classList.remove('hidden');
+      } else signReadEl.classList.add('hidden');
+    }
   }
 
   function updateDebug() {
@@ -2826,10 +3176,34 @@
         openChestAt(currentHit.x, currentHit.y, currentHit.z);
         return;
       }
+      if (BLOCKS[hitId2] && BLOCKS[hitId2].furnace) {
+        openFurnaceAt(currentHit.x, currentHit.y, currentHit.z);
+        return;
+      }
+      if (BLOCKS[hitId2] && BLOCKS[hitId2].door) {
+        toggleDoorAt(currentHit.x, currentHit.y, currentHit.z, hitId2);
+        return;
+      }
+      if (BLOCKS[hitId2] && BLOCKS[hitId2].sign) {
+        openSignEdit(currentHit.x, currentHit.y, currentHit.z);
+        return;
+      }
       const held = inv[selectedSlot];
       if (!held) return;
       if (held.id >= 100) {
         const it = ITEMS[held.id];
+        if (held.id === 116) {
+          const mob = pickMob();
+          if (mob && mob.type === 'cow') {
+            held.count--;
+            if (held.count <= 0) inv[selectedSlot] = null;
+            addItem(117, 1);
+            swingT = 1;
+            playSound(85, 0.5, 0.08, 'sawtooth');
+            showToast('Seau de lait rempli !');
+          }
+          return;
+        }
         if (it.bow) {
           if (gameMode === 'creative' || countItem(112) > 0) {
             bowCharging = true;
@@ -2844,6 +3218,23 @@
           updateArmorUI();
           swingT = 1;
           playSound(360, 0.15, 0.12);
+        }
+        if (it.milk) {
+          player.hunger = 20;
+          player.health = Math.min(20, player.health + 4);
+          updateHealthUI(); updateHungerUI();
+          held.count--;
+          if (held.count <= 0) inv[selectedSlot] = null;
+          addItem(116, 1); // le seau revient vide
+          updateHotbarUI();
+          swingT = 1;
+          playSound(300, 0.3, 0.1, 'sine');
+        }
+        if (it.egg) {
+          throwEgg();
+          held.count--;
+          if (held.count <= 0) inv[selectedSlot] = null;
+          updateHotbarUI();
         }
         if (it.food && player.hunger < 20) {
           player.hunger = Math.min(20, player.hunger + it.food);
@@ -2862,6 +3253,21 @@
       if (py < 1 || py >= WORLD_H) return;
       const cur = getBlock(px, py, pz);
       if (cur !== AIR && !E.isWater(cur)) return;
+      if (held.id === DOOR_L) {
+        if (py + 1 >= WORLD_H) return;
+        const above = getBlock(px, py + 1, pz);
+        if (above !== AIR && !E.isWater(above)) return;
+        swingT = 1;
+        applyBlock(px, py, pz, DOOR_L, true);
+        applyBlock(px, py + 1, pz, DOOR_U, true);
+        if (gameMode === 'survival') {
+          held.count--;
+          if (held.count <= 0) inv[selectedSlot] = null;
+        }
+        updateHotbarUI();
+        playSound(170, 0.12, 0.13, 'square');
+        return;
+      }
       if (E.isSolid(held.id) && blockIntersectsPlayer(px, py, pz)) return;
       if (E.BLOCKS[held.id] && E.BLOCKS[held.id].plant && !E.isSolid(getBlock(px, py - 1, pz))) return;
       swingT = 1;
@@ -2883,6 +3289,22 @@
   });
 
   document.getElementById('btn-solo').addEventListener('click', startGame);
+  const btnHost = document.getElementById('btn-host');
+  const btnJoin = document.getElementById('btn-join');
+  if (btnHost) btnHost.addEventListener('click', () => startNet('host'));
+  if (btnJoin) btnJoin.addEventListener('click', () => startNet('join'));
+  const roomCodeInput = document.getElementById('room-code');
+  if (roomCodeInput) roomCodeInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.code === 'Enter') { e.preventDefault(); startNet('join'); }
+    if (e.code === 'KeyW' || e.code === 'KeyZ') e.stopPropagation();
+  });
+  const signEditEls = signEditElements();
+  if (signEditEls.ok) signEditEls.ok.addEventListener('click', () => closeSignEdit(true));
+  if (signEditEls.no) signEditEls.no.addEventListener('click', () => closeSignEdit(false));
+  if (signEditEls.inp) signEditEls.inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.code === 'Enter') { e.preventDefault(); closeSignEdit(true); }
+    if (e.key === 'Escape' || e.code === 'Escape') { e.preventDefault(); closeSignEdit(false); }
+  });
   document.getElementById('btn-resume').addEventListener('click', () => canvas.requestPointerLock());
   document.getElementById('btn-quit').addEventListener('click', quitToMenu);
   document.getElementById('btn-respawn').addEventListener('click', respawn);
@@ -2904,7 +3326,8 @@
   document.addEventListener('mousemove', (e) => {
     const tipEl = document.getElementById('item-tip');
     const tgt = e.target;
-    const tip = tgt && tgt.getAttribute ? tgt.getAttribute('data-tip') : null;
+    const src = tgt && tgt.closest ? tgt.closest('[data-tip]') : null;
+    const tip = src ? src.getAttribute('data-tip') : null;
     if (tipsAreHidden(tipEl) || !tip) { if (tipEl && !tipsAreHidden(tipEl)) tipEl.classList.add('hidden'); return; }
     tipEl.textContent = tip;
     tipEl.classList.remove('hidden');
@@ -3018,11 +3441,204 @@
       updateClouds(dt);
       updateHeld(dt);
       updateDebug();
+      updateSignRead();
+      tickMusic(dt);
+      netTick(dt);
     }
     renderer.render(scene, camera);
   }
 
   animate();
+
+  // ==================== MULTIOUEUEUR (paresseux, isole) ====================
+  const netState = {
+    active: false, role: 'solo', client: null, room: null,
+    id: Math.random().toString(36).slice(2, 10), players: new Map(),
+    outBlocks: [], posTimer: 0, joinTimer: null, joining: false
+  };
+  function currentNetRole() { return netState.active ? netState.role : 'solo'; }
+  function netPublish(obj) {
+    if (netState.client && netState.room) {
+      try { netState.client.publish('webcraft/v1/' + netState.room, JSON.stringify(obj)); } catch (err) {}
+    }
+  }
+  function playerName() {
+    try { return localStorage.getItem('webcraft_name') || 'Joueur' + (netState.id % 97); }
+    catch (e) { return 'Joueur'; }
+  }
+  function makeRoomCode() {
+    const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let c = ''; for (let i = 0; i < 5; i++) c += A[(Math.random() * A.length) | 0];
+    return c;
+  }
+  function netStatusEl() { return document.getElementById('net-status'); }
+  function netStatus(msg, isError) {
+    const el = netStatusEl();
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.toggle('error', !!isError);
+    el.classList.remove('hidden');
+  }
+  function netEnd() {
+    if (netState.client) { try { netState.client.end(true); } catch (err) {} }
+    netState.client = null;
+    netState.room = null;
+    netState.active = false;
+    for (const p of netState.players.values()) scene.remove(p.mesh);
+    netState.players.clear();
+  }
+  function upsertPlayer(pid, name, x, y, z, yaw, pitch) {
+    const AV = [0x3b6fd4, 0xd43b3b, 0x3bd46f, 0xd4b23b, 0x9b3bd4, 0x3bc9d4];
+    let p = netState.players.get(pid);
+    if (!p) {
+      const g = new THREE.Group();
+      const col = AV[Object.keys(netState.players).length % AV.length];
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.8, 0.3), new THREE.MeshBasicMaterial({ color: col }));
+      body.position.y = 1.15;
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({ color: 0xd8a380 }));
+      head.position.y = 1.85;
+      const legs = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.75, 0.24), new THREE.MeshBasicMaterial({ color: 0x2f4f7a }));
+      legs.position.y = 0.37;
+      g.add(body); g.add(head); g.add(legs);
+      scene.add(g);
+      p = { mesh: g, name: name || pid };
+      netState.players.set(pid, p);
+      showToast(p.name + ' a rejoint la partie');
+    }
+    p.mesh.position.set(x, y, z);
+    p.mesh.rotation.y = yaw || 0;
+  }
+  function onNetMessage(topic, payload) {
+    let msg;
+    try { msg = JSON.parse(payload.toString ? payload.toString() : String(payload)); } catch (err) { return; }
+    if (!msg || msg.from === netState.id) return;
+    if (msg.t === 'hello') {
+      if (currentNetRole() !== 'host' || gameState !== 'playing') return;
+      upsertPlayer(msg.from, msg.name, player.pos.x, player.pos.y, player.pos.z, 0, 0);
+      const ed = {};
+      for (const [k, m] of editsByChunk) ed[k] = m;
+      const sg = {};
+      for (const [k, v] of signData) sg[k] = v;
+      netPublish({ t: 'welcome', from: netState.id, seed: E.getSeed(), mode: gameMode, edits: ed, signs: sg, dayTime });
+      return;
+    }
+    if (msg.t === 'welcome') {
+      if (!netState.joining) return;
+      netState.joining = false;
+      if (netState.joinTimer) { clearTimeout(netState.joinTimer); netState.joinTimer = null; }
+      modeSelect.value = msg.mode === 'creative' ? 'creative' : 'survival';
+      E.setSeed(msg.seed | 0);
+      try { localStorage.setItem('webcraft_seed', String(msg.seed | 0)); } catch (e) {}
+      editsByChunk.clear();
+      for (const k in (msg.edits || {})) editsByChunk.set(k, msg.edits[k]);
+      try { localStorage.setItem('webcraft_edits_' + (msg.seed | 0), JSON.stringify(msg.edits || {})); } catch (e) {}
+      signData.clear();
+      for (const k in (msg.signs || {})) signData.set(k, String(msg.signs[k]));
+      guestStartDayTime = typeof msg.dayTime === 'number' ? msg.dayTime : 0.03;
+      startGame();
+      netStatus('Connect\u00e9 au salon ' + netState.room);
+      return;
+    }
+    if (gameState !== 'playing') return;
+    if (msg.t === 'pos') {
+      upsertPlayer(msg.from, msg.name, msg.x, msg.y, msg.z, msg.yaw, msg.pitch);
+    } else if (msg.t === 'blocks') {
+      for (const c of (msg.changes || [])) applyBlock(c[0], c[1], c[2], c[3], false);
+      startGameFlush();
+    } else if (msg.t === 'bye') {
+      const p = netState.players.get(msg.from);
+      if (p) {
+        scene.remove(p.mesh);
+        netState.players.delete(msg.from);
+        showToast(p.name + ' a quitté la partie');
+      }
+    }
+  }
+  let guestStartDayTime = null;
+  function startGameFlush() {
+    // re-rendit les chunks modifies par le reseau sans re-generer le monde
+    for (const ch of chunks.values()) if (ch.built) buildChunkMesh(ch);
+  }
+  function startNet(role) {
+    if (typeof mqtt === 'undefined') {
+      netStatus('Multijoueur indisponible (mqtt.min.js manquant)', true);
+      return;
+    }
+    netEnd();
+    const codeInput = document.getElementById('room-code');
+    if (role === 'join') {
+      const code = (codeInput && codeInput.value ? codeInput.value : '').trim().toUpperCase();
+      if (code.length < 4) { netStatus('Entre le code du salon (5 caractères)', true); return; }
+      netState.room = code;
+      netState.joining = true;
+    } else {
+      netState.room = makeRoomCode();
+      if (codeInput) codeInput.value = netState.room;
+    }
+    netStatus('Connexion au serveur…');
+    netState.active = true;
+    try {
+      netState.client = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+        clientId: 'webcraft_' + netState.id, keepalive: 30, reconnectPeriod: 0, connectTimeout: 10000
+      });
+    } catch (err) {
+      netStatus('Erreur de connexion', true);
+      netState.active = false;
+      return;
+    }
+    netState.client.on('connect', () => {
+      netState.client.subscribe('webcraft/v1/' + netState.room);
+      if (role === 'host') {
+        netStatus('Salon créé : ' + netState.room + ' — partage le code !');
+        startGame();
+      } else {
+        netPublish({ t: 'hello', from: netState.id, name: playerName() });
+        netStatus('Recherche de la partie ' + netState.room + '…');
+        netState.joinTimer = setTimeout(() => {
+          if (gameState === 'menu' && netState.joining) {
+            netState.joining = false;
+            netStatus('Partie introuvable. Vérifie le code.', true);
+            netEnd();
+          }
+        }, 10000);
+      }
+    });
+    netState.client.on('message', onNetMessage);
+    netState.client.on('error', () => { if (gameState === 'menu') netStatus('Erreur de connexion au serveur', true); });
+    netState.client.on('close', () => { if (gameState === 'menu' && netState.joining) { netState.joining = false; netStatus('Déconnecté', true); } });
+  }
+  function netTick(dt) {
+    if (!netState.active || !netState.client || gameState !== 'playing') return;
+    if (netState.slowTimer === undefined) netState.slowTimer = 0;
+    netState.slowTimer -= dt;
+    if (netState.slowTimer <= 0) {
+      netState.slowTimer = 0.3;
+      if (netState.outBlocks.length) {
+        const changes = netState.outBlocks.splice(0, netState.outBlocks.length);
+        netPublish({ t: 'blocks', from: netState.id, changes });
+      }
+    }
+    netState.posTimer -= dt;
+    if (netState.posTimer <= 0) {
+      netState.posTimer = 0.12;
+      netPublish({
+        t: 'pos', from: netState.id, name: playerName(),
+        x: +player.pos.x.toFixed(2), y: +player.pos.y.toFixed(2), z: +player.pos.z.toFixed(2),
+        yaw: +player.yaw.toFixed(2), pitch: +player.pitch.toFixed(2)
+      });
+    }
+  }
+  function netOutBlock(x, y, z, id) {
+    if (!netState.active) return;
+    netState.outBlocks.push([x, y, z, id]);
+    if (netState.outBlocks.length >= 12) {
+      const changes = netState.outBlocks.splice(0, netState.outBlocks.length);
+      netPublish({ t: 'blocks', from: netState.id, changes });
+    }
+  }
+  window.addEventListener('beforeunload', () => {
+    if (netState.active) netPublish({ t: 'bye', from: netState.id });
+  });
 
   window.WebCraftDebug = {
     addItem,
@@ -3057,6 +3673,10 @@
     takeItem,
     SMELT,
     spawnPlayerArrow,
+    toggleDoorAt, doorOpen, signData, openSignEdit, closeSignEdit, throwEgg,
+    toggleMusic,
+    get musicOn() { return musicOn; },
+    netStart: (r) => startNet(r), netEnd, netOutBlock, currentNetRole, netState,
     villages,
     get openChestArr() { return openChestArr; },
     get armorWorn() { return armorWorn; },
