@@ -355,3 +355,11 @@ input, select {
   z-index: 6;
   pointer-events: none;
 }
+
+/* --- Wave 3 : sommeil, toast, armure, coffres --- */
+#sleep-fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity 1.4s ease;z-index:40;}
+#toast{position:fixed;left:50%;bottom:130px;transform:translateX(-50%);background:rgba(0,0,0,.72);color:#fff;padding:8px 16px;border-radius:4px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:41;}
+#toast.visible{opacity:1;}
+#armor-ind{position:fixed;left:50%;transform:translateX(-50%);bottom:106px;font-size:18px;display:none;z-index:15;}
+#inv-chest-row{display:grid;grid-template-columns:repeat(9,54px);gap:4px;margin-bottom:8px;justify-content:center;}
+#inv-chest-row.hidden{display:none;}

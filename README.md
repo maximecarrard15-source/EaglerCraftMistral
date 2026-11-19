@@ -63,6 +63,17 @@ Lancer en local : double-cliquez `index.html` ou `npx serve .`
   épée en bois, **pioche en bois et en fer** (indispensables pour la pierre et le fer).
 - Les blocs cassés se remettent dans l'inventaire ; le monde sauvegarde vos
   modifications automatiquement (localStorage, par graine).
+- **Coffres** : posables (clic droit pour ouvrir), 27 cases, contenu conservé
+  dans le monde ; leur butin se repand au sol s'ils sont cassés ou explosés.
+- **Lit** : la nuit (ou sous la pluie…), clic droit pour dormir — le temps passe
+  au matin et votre **point de réapparition** y est fixé. Recette : 3 laines
+  au-dessus de 3 planches.
+- **Plastron en fer** : réduit les dégâts subis de 35 %. S'équipe/retire par
+  clic droit (recette 8 lingots de fer), indicateur 🛡 au-dessus des barres.
+- **Villages** : des petites cabanes (lit, coffre approvisionné, torche,
+  fenêtres) apparaissent parfois dans les plaines.
+- **Sortie d'eau façon Minecraft** : en nageant contre un bord, vous êtes
+  automatiquement propulsé hors de l'eau, même sur un bloc à la même hauteur.
 
 ## Commandes
 
@@ -88,8 +99,18 @@ Lancer en local : double-cliquez `index.html` ou `npx serve .`
 - `js/three.min.js` — Three.js r128 (vendu, aucune installation).
 - Aucune build, aucun serveur : fichiers statiques.
 
+## Textures
+
+L'atlas de textures (16×16) est **redessiné à la main dans le style de
+Minecraft** (herbe bordée, bûches cerclées, briques en quinconce, minerais
+mouchetés, fleurs, lit, coffre…). Les textures officielles de Mojang ne peuvent
+pas être copiées (droits d'auteur) : celles-ci ont été recréées de zéro, en
+reprenant les codes et les motifs emblématiques (tile 16×16, bord d'herbe,
+bûche cerclée, briques en quinconce…).
+
 ## Vérification
 
-Suite de tests sans navigateur : `node /tmp/smoke.js` (harnais à reconstituer via
-VM Node) — 42 contrôles : moteur, grottes, biomes, craft, minage/délais, drops,
-faim/regen, explosions, squelettes/flèches, XP, sable, jour/nuit, mobs, particules.
+Suite de tests sans navigateur : `node /tmp/smoke.js` (harnais VM Node) —
+46 contrôles : moteur, grottes, biomes, craft, minage/délais, drops, faim/regen,
+explosions, squelettes/flèches, XP, sable, jour/nuit, mobs, particules,
+**sortie d'eau, lit/dormir, armure, coffres persistants, villages**.

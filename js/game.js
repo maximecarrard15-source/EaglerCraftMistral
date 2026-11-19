@@ -9,7 +9,8 @@
         GLASS = E.GLASS, BRICK = E.BRICK, SNOW = E.SNOW, GRAVEL = E.GRAVEL,
         WOOL = E.WOOL, COAL_ORE = E.COAL_ORE, IRON_ORE = E.IRON_ORE,
         TABLE = E.TABLE, TORCH = E.TORCH,
-        FLOWER_RED = E.FLOWER_RED, FLOWER_YELLOW = E.FLOWER_YELLOW, TALLGRASS = E.TALLGRASS;
+        FLOWER_RED = E.FLOWER_RED, FLOWER_YELLOW = E.FLOWER_YELLOW, TALLGRASS = E.TALLGRASS,
+        BED = E.BED, CHEST = E.CHEST;
 
   const ITEMS = {
     100: { name: 'Charbon', tile: 22 },
@@ -20,6 +21,7 @@
     105: { name: 'Fer', tile: 27 },
     106: { name: 'Épée en fer', tile: 28, sword: 3, maxStack: 1 },
     107: { name: 'Pioche en bois', tile: 29, pick: 2.6, maxStack: 1 },
+    109: { name: 'Plastron en fer', tile: 38, armor: 5, maxStack: 1 },
     108: { name: 'Pioche en fer', tile: 30, pick: 4.5, maxStack: 1 }
   };
 
@@ -43,7 +45,9 @@
     { shape: [[PLANKS], [101]], out: { id: 102, count: 1 } },
     { shape: [[105], [101]], out: { id: 106, count: 1 } },
     { shape: [[PLANKS, PLANKS, PLANKS], [null, 101, null], [null, 101, null]], out: { id: 107, count: 1 } },
-    { shape: [[105, 105, 105], [null, 101, null], [null, 101, null]], out: { id: 108, count: 1 } }
+    { shape: [[105, 105, 105], [null, 101, null], [null, 101, null]], out: { id: 108, count: 1 } },
+    { shape: [[WOOL, WOOL, WOOL], [PLANKS, PLANKS, PLANKS]], out: { id: BED, count: 1 } },
+    { shape: [[105, null, 105], [105, 105, 105], [105, 105, 105]], out: { id: 109, count: 1 } }
   ].map((r) => ({ rows: trimShape(r.shape).map((row) => row.map((c) => c || 0)), out: r.out }));
 
   const GRAVITY = 30, JUMP_V = 8.8, WALK_SPEED = 4.4, SPRINT_MULT = 1.55,
@@ -87,6 +91,10 @@
   const hungerEl = document.getElementById('hunger');
   const xpFillEl = document.getElementById('xp-fill');
   const xpLevelEl = document.getElementById('xp-level');
+  const sleepFadeEl = document.getElementById('sleep-fade');
+  const toastEl = document.getElementById('toast');
+  const armorIndEl = document.getElementById('armor-ind');
+  const chestRowEl = document.getElementById('inv-chest-row');
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -322,145 +330,154 @@
       ctx.putImageData(img, (idx % COLS) * T, ((idx / COLS) | 0) * T);
     }
 
-    tile(0, (x, y, r) => { const m = n(14, r); return [106 + m, 169 + m, 64 + m * 0.6]; });
+    // --- terrain ---
+    tile(0, (x, y, r) => {
+      const m = n(13, r);
+      const patch = E.hash2(x >> 2, y >> 2, 41) < 0.25 ? -11 : 0;
+      return [106 + m + patch, 170 + m + patch, 64 + m * 0.7 + patch];
+    });
     tile(1, (x, y, r) => {
-      const strip = 2 + (E.hash2(x, 999, 55) > 0.5 ? 1 : 0);
-      if (y < strip) { const m = n(14, r); return [106 + m, 169 + m, 64 + m * 0.6]; }
-      const m = n(12, r); return [134 + m, 96 + m, 67 + m * 0.8];
+      const edge = 3 + (E.hash2(x, 0, 51) < 0.5 ? 1 : 0);
+      const m = n(12, r);
+      if (y < edge) return [106 + m, 170 + m, 64 + m];
+      return [134 + m, 96 + m, 67 + m];
     });
-    tile(2, (x, y, r) => { const m = n(12, r); return [134 + m, 96 + m, 67 + m * 0.8]; });
+    tile(2, (x, y, r) => {
+      const m = n(13, r);
+      const dk = r > 0.86 ? -18 : 0;
+      return [134 + m + dk, 96 + m + dk, 67 + m + dk];
+    });
     tile(3, (x, y, r) => {
-      let g = 125 + n(12, r);
-      if (E.hash2(x >> 1, y >> 1, 88) < 0.2) g -= 25;
-      return [g, g, g];
+      const blot = (E.hash2(x >> 1, y >> 1, 91) - 0.5) * 16;
+      const m = n(8, r);
+      return [127 + m + blot, 127 + m + blot, 127 + m + blot];
     });
-    tile(4, (x, y, r) => { const m = n(10, r); return [219 + m, 207 + m, 158 + m]; });
+    tile(4, (x, y, r) => { const m = n(9, r); return [219 + m, 207 + m, 163 + m]; });
     tile(5, (x, y, r) => {
-      const s = E.hash2(x, 0, 44) < 0.5 ? -18 : 8;
-      const m = n(6, r);
-      return [104 + s + m, 82 + s * 0.8 + m, 50 + s * 0.5 + m];
+      const hcol = E.hash2(x, 0, 77);
+      const stripe = hcol < 0.3 ? -22 : (hcol > 0.7 ? 12 : 0);
+      const m = n(8, r);
+      return [109 + stripe + m, 85 + stripe + m, 51 + stripe + m];
     });
     tile(6, (x, y, r) => {
-      const d = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5)) | 0;
+      const ring = Math.floor(Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5)));
       const m = n(6, r);
-      return d % 2 === 0 ? [168 + m, 134 + m, 80 + m] : [120 + m, 94 + m, 55 + m];
+      if (ring >= 7) return [109 + m, 85 + m, 51 + m];
+      return ring % 2 === 0 ? [175 + m, 143 + m, 91 + m] : [152 + m, 121 + m, 73 + m];
     });
     tile(7, (x, y, r) => {
-      if (r < 0.15) return [30, 70, 22];
-      const m = n(22, r);
-      return [60 + m, 124 + m, 42 + m * 0.7];
+      const m = n(20, r);
+      if (r < 0.12) return [28 + m * 0.4, 70 + m * 0.4, 20 + m * 0.4];
+      return [60 + m, 124 + m, 38 + m];
     });
-    tile(8, (x, y, r) => { const m = n(8, r); return [47 + m, 93 + m, 209 + m]; });
+    tile(8, (x, y, r) => { const m = n(9, r); return [47 + m, 93 + m, 209 + m]; });
     tile(9, (x, y, r) => {
-      let g = 0;
-      if (y % 4 === 0) g -= 35;
-      if ((x + ((y >> 2) % 2) * 8) % 16 === 0) g -= 40;
-      const m = n(10, r);
-      return [160 + g + m, 130 + g + m, 78 + g + m];
+      const seam = (y % 4 === 3) || (x === ((y >> 2) * 5 + 3) % 16);
+      const m = n(7, r);
+      return seam ? [117 + m, 92 + m, 53 + m] : [162 + m, 130 + m, 78 + m];
     });
     tile(10, (x, y, r) => {
-      let g = 105 + E.hash2((x / 4) | 0, (y / 3) | 0, 12) * 30 + n(10, r);
-      if (x % 4 === 0 || y % 3 === 0) g -= 35;
-      return [g, g, g];
+      const bx = E.hash2(x >> 2, y >> 2, 33);
+      const edge = (x % 4 === 0) || (y % 4 === 0);
+      const m = n(7, r);
+      let v = 108 + bx * 36 + m;
+      if (edge) v -= 34;
+      return [v, v, v];
     });
     tile(11, (x, y, r) => {
-      if (x === 0 || y === 0 || x === 15 || y === 15) return [220, 235, 240, 255];
-      if ((x - y + 32) % 8 < 1 && x > 2 && x < 13) return [235, 245, 250, 140];
-      return [0, 0, 0, 0];
+      if (x === 0 || y === 0 || x === 15 || y === 15) return [210, 230, 235, 255];
+      if (x - y === 4 || x - y === 5) return [235, 245, 250, 120];
+      return [190, 220, 230, 22];
     });
     tile(12, (x, y, r) => {
-      const mortar = y % 4 === 3 || (x + ((y >> 2) % 2) * 4) % 8 === 7;
-      const m = n(8, r);
-      if (mortar) { const g = 155 + m; return [g, g, g]; }
-      return [148 + m, 66 + m * 0.6, 58 + m * 0.6];
+      const row = y >> 2;
+      const mortar = (y % 4 === 3) || ((x + (row % 2) * 4) % 8 === 7);
+      const m = n(9, r);
+      return mortar ? [188 + m, 180 + m, 172 + m] : [150 + m, 84 + m, 62 + m];
     });
     tile(13, (x, y, r) => {
-      const v = E.hash2(x >> 1, y >> 1, 33);
-      const g = (v < 0.4 ? 40 : v < 0.7 ? 70 : 100) + n(6, r);
-      return [g, g, g];
+      const b = E.hash2(x >> 2, y >> 2, 55) * 60 + 36 + n(8, r);
+      return [b, b, b];
     });
-    tile(14, (x, y, r) => { const m = n(6, r); return [235 + m, 240 + m, 248 + m]; });
+    tile(14, (x, y, r) => { const m = n(5, r); return [240 + m, 250 + m, 250 + m]; });
     tile(15, (x, y, r) => {
-      const v = E.hash2(x, y, 21);
-      const m = n(8, r);
-      if (v < 0.33) return [110 + m, 105 + m, 100 + m];
-      if (v < 0.66) return [140 + m, 135 + m, 128 + m];
-      return [95 + m, 90 + m, 88 + m];
+      const b = E.hash2(x >> 1, y >> 1, 88) * 46 + 96 + n(8, r);
+      return [b, b - 5, b - 10];
     });
     tile(16, (x, y, r) => {
-      const blob = E.hash3(x >> 1, y >> 1, 5, 91) < 0.3;
-      let g = 125 + n(12, r);
-      if (blob) return [30 + n(10, r), 30, 32];
-      return [g, g, g];
+      if (E.hash2(x >> 1, y >> 1, 66) > 0.76) { const m = n(6, r); return [30 + m, 30 + m, 33 + m]; }
+      const blot = (E.hash2(x >> 1, y >> 1, 91) - 0.5) * 16, m = n(8, r);
+      return [127 + m + blot, 127 + m + blot, 127 + m + blot];
     });
     tile(17, (x, y, r) => {
-      const blob = E.hash3(x >> 1, y >> 1, 9, 92) < 0.28;
-      let g = 125 + n(12, r);
-      if (blob) return [216 + n(12, r), 170 + n(10, r), 140];
-      return [g, g, g];
+      if (E.hash2(x >> 1, y >> 1, 67) > 0.76) { const m = n(8, r); return [216 + m, 175 + m, 147 + m]; }
+      const blot = (E.hash2(x >> 1, y >> 1, 91) - 0.5) * 16, m = n(8, r);
+      return [127 + m + blot, 127 + m + blot, 127 + m + blot];
     });
     tile(18, (x, y, r) => {
-      const border = x < 2 || y < 2 || x > 13 || y > 13;
-      const m = n(8, r);
-      if (border) return [120 + m, 88 + m, 48 + m];
-      return [178 + m, 142 + m, 86 + m];
+      const border = x < 1 || y < 1 || x > 14 || y > 14;
+      const seam = (y % 4 === 3);
+      const grid = (x === 8 || y === 8);
+      const m = n(7, r);
+      if (border || grid) return [102 + m, 80 + m, 46 + m];
+      return seam ? [117 + m, 92 + m, 53 + m] : [168 + m, 134 + m, 82 + m];
     });
     tile(19, (x, y, r) => {
-      const window1 = (x > 2 && x < 7 && y > 3 && y < 8);
-      const window2 = (x > 9 && x < 14 && y > 3 && y < 8);
-      const top = y < 3;
-      const m = n(8, r);
-      if (top) return [150 + m, 112 + m, 62 + m];
-      if (window1 || window2) return [96 + m, 68 + m, 36 + m];
-      return [168 + m, 132 + m, 78 + m];
+      if (y < 3) { const m = n(7, r); return [94 + m, 73 + m, 42 + m]; }
+      const tool = (x > 3 && x < 7 && y > 5 && y < 9) || (x > 9 && x < 13 && y > 5 && y < 8);
+      if (tool) { const m = n(6, r); return [72 + m, 56 + m, 34 + m]; }
+      const m = n(7, r);
+      return [162 + m, 130 + m, 78 + m];
     });
     tile(20, (x, y, r) => {
-      if (x < 6 || x > 9 || y > 10) return [0, 0, 0, 0];
-      if (y < 3) return [255, 216 + n(20, r), 90 + n(30, r)];
-      const m = n(10, r);
-      return [120 + m, 88 + m, 46 + m];
+      if (y > 4 && y < 15 && x > 6 && x < 9) { const m = n(8, r); return [112 + m, 85 + m, 48 + m]; }
+      if (y >= 1 && y <= 4 && x > 5 && x < 10) {
+        if (y <= 2) return [255, 245, 180];
+        return [255, 205 + n(20, r), 80 + n(30, r)];
+      }
+      return [0, 0, 0, 0];
     });
     tile(21, (x, y, r) => {
-      const weave = ((x + y) % 4 < 2) ? 8 : -8;
+      const weave = ((x + y) % 4 < 2) ? 5 : -5;
       const m = n(6, r);
-      return [228 + weave + m, 228 + weave + m, 224 + weave + m];
+      return [231 + weave + m, 233 + weave + m, 235 + weave + m];
     });
+    // --- items ---
     tile(22, (x, y, r) => {
       const d = Math.abs(x - 8) + Math.abs(y - 8);
-      if (d > 7 || E.hash2(x, y, 71) < 0.2) return [0, 0, 0, 0];
-      const g = 35 + n(14, r);
-      return [g, g, g + 4];
+      if (d > 6) return [0, 0, 0, 0];
+      const m = n(10, r);
+      return d < 3 && x < 8 ? [95 + m, 95 + m, 100 + m] : [35 + m, 35 + m, 38 + m];
     });
     tile(23, (x, y, r) => {
-      const d = Math.abs(x - y);
-      if (d > 2 || x < 3 || x > 12) return [0, 0, 0, 0];
+      const d = Math.abs((15 - y) - x);
+      if (d > 1 || x < 3 || x > 12) return [0, 0, 0, 0];
       const m = n(10, r);
-      return [140 + m, 104 + m, 56 + m];
+      return [146 + m, 106 + m, 60 + m];
     });
     tile(24, (x, y, r) => {
       const d = x - (15 - y);
       if (d < -1 || d > 2 || x < 6) return [0, 0, 0, 0];
       if (x < 9) { const m = n(10, r); return [104 + m, 82 + m, 50 + m]; }
       const m = n(8, r);
-      return [170 + m, 134 + m, 80 + m];
+      return [172 + m, 134 + m, 80 + m];
     });
     tile(25, (x, y, r) => {
       const d = Math.abs(x - 8) + Math.abs(y - 8);
       if (d > 6) return [0, 0, 0, 0];
-      const m = n(14, r);
-      return d < 3 ? [240 + m, 170 + m, 170 + m] : [205 + m, 110 + m, 110 + m];
+      const m = n(10, r);
+      return d < 3 ? [250 + m, 190 + m, 178 + m] : [240 + m, 150 + m, 140 + m];
     });
     tile(26, (x, y, r) => {
       const d = Math.abs(x - 8) + Math.abs(y - 8);
       if (d > 6) return [0, 0, 0, 0];
-      const m = n(12, r);
-      return d < 2 ? [235 + m, 230 + m, 215 + m] : [190 + m, 80 + m, 70 + m];
+      const m = n(10, r);
+      return d < 2 ? [250 + m, 168 + m, 152 + m] : [228 + m, 116 + m, 100 + m];
     });
     tile(27, (x, y, r) => {
-      const d = Math.abs(x - 8) + Math.abs(y - 8);
-      if (d > 7 || E.hash2(x, y, 73) < 0.15) return [0, 0, 0, 0];
-      const m = n(14, r);
-      return [216 + m, 220 + m, 226 + m];
+      if (y < 6 || y > 10 || x < 2 || x > 13) return [0, 0, 0, 0];
+      const m = n(7, r);
+      return y === 10 ? [182 + m, 182 + m, 188 + m] : [218 + m, 218 + m, 224 + m];
     });
     tile(28, (x, y, r) => {
       const d = x - (15 - y);
@@ -487,28 +504,64 @@
       if (head) return [216 + n(8, r), 220 + n(8, r), 226 + n(8, r)];
       return [0, 0, 0, 0];
     });
+    // --- plantes ---
     tile(31, (x, y, r) => {
       const d = Math.abs(x - 8) + Math.abs(y - 8);
-      if (y > 9 && x === 8) return [62 + n(10, r), 128 + n(10, r), 48 + n(10, r)];
+      if (y > 9 && x === 8) { const m = n(10, r); return [62 + m, 128 + m, 48 + m]; }
       if (d < 4) return [214 + n(16, r), 52 + n(14, r), 48 + n(14, r)];
       return [0, 0, 0, 0];
     });
     tile(32, (x, y, r) => {
       const d = Math.abs(x - 8) + Math.abs(y - 8);
-      if (y > 9 && x === 8) return [62 + n(10, r), 128 + n(10, r), 48 + n(10, r)];
+      if (y > 9 && x === 8) { const m = n(10, r); return [62 + m, 128 + m, 48 + m]; }
       if (d < 4) return [244 + n(10, r), 222 + n(12, r), 60 + n(14, r)];
       return [0, 0, 0, 0];
     });
     tile(33, (x, y, r) => {
       const blade = Math.abs(Math.sin(x * 1.7)) * 4.5;
-      if (y < 10.5 - blade + 10.5) return [0, 0, 0, 0];
       if (y < 15 - blade) return [0, 0, 0, 0];
       const m = n(14, r);
       return [88 + m, 150 + m, 58 + m];
     });
+    // --- lit / coffre / armure ---
+    tile(34, (x, y, r) => {
+      if (x === 0 || x === 15 || y === 0 || y === 15) return [107 + n(6, r), 84 + n(6, r), 52 + n(6, r)];
+      if (y < 6) { const m = n(6, r); return [235 + m, 235 + m, 238 + m]; }
+      const weave = ((x + y) % 4 < 2) ? 6 : -6;
+      const m = n(7, r);
+      return [176 + weave + m, 44 + weave * 0.4 + m * 0.4, 40 + weave * 0.4 + m * 0.4];
+    });
+    tile(35, (x, y, r) => {
+      if (y < 9) { const weave = ((x + y) % 4 < 2) ? 6 : -6; const m = n(7, r); return [176 + weave + m, 44 + m, 40 + m]; }
+      const m = n(8, r);
+      return [112 + m, 85 + m, 48 + m];
+    });
+    tile(36, (x, y, r) => {
+      if (x === 0 || y === 0 || x === 15 || y === 15) return [88 + n(6, r), 62 + n(6, r), 30 + n(6, r)];
+      if (x > 6 && x < 9 && y > 4 && y < 10) return [122 + n(8, r), 122 + n(8, r), 128 + n(8, r)];
+      if (y === 4) return [88 + n(6, r), 62 + n(6, r), 30 + n(6, r)];
+      const m = n(8, r);
+      return [152 + m, 110 + m, 58 + m];
+    });
+    tile(37, (x, y, r) => {
+      if (x === 0 || y === 0 || x === 15 || y === 15) return [88 + n(6, r), 62 + n(6, r), 30 + n(6, r)];
+      const m = n(8, r);
+      return [152 + m, 110 + m, 58 + m];
+    });
+    tile(38, (x, y, r) => {
+      const shoulder = ((x > 1 && x < 6) || (x > 9 && x < 14)) && y > 2 && y < 8;
+      const torso = x > 3 && x < 12 && y > 4 && y < 13;
+      const neck = x > 5 && x < 10 && y > 2 && y < 6;
+      if (neck && !torso) return [0, 0, 0, 0];
+      if (shoulder || torso) {
+        const m = n(10, r);
+        const shade = (x > 3 && x < 12) ? 0 : -25;
+        return [216 + m + shade, 216 + m + shade, 222 + m + shade];
+      }
+      return [0, 0, 0, 0];
+    });
     return cv;
   }
-
   function chunkKey(cx, cz) { return cx + ',' + cz; }
 
   function getChunk(cx, cz) {
@@ -558,6 +611,10 @@
         stampTree(data, x0, z0, wx, wz);
       }
     }
+    if (E.hash2(ch.cx, ch.cz, 9001) < 0.05 && x0 >= -160 && x0 < 160 && z0 >= -160 && z0 < 160 &&
+        E.biomeAt(x0 + 8, z0 + 8) === 'plains') {
+      stampHouse(data, x0, z0, x0 + 8, z0 + 8);
+    }
     const em = editsByChunk.get(chunkKey(ch.cx, ch.cz));
     if (em) {
       for (const k in em) {
@@ -575,6 +632,54 @@
     if (torchList.length) torchesByChunk.set(chunkKey(ch.cx, ch.cz), torchList);
     else torchesByChunk.delete(chunkKey(ch.cx, ch.cz));
     ch.data = data;
+  }
+
+  function stampHouse(data, x0, z0, hx, hz) {
+    const hs = [];
+    for (const dx of [-3, 0, 3]) for (const dz of [-3, 0, 3]) hs.push(E.terrainHeight(hx + dx, hz + dz));
+    const minH = Math.min.apply(null, hs), maxH = Math.max.apply(null, hs);
+    if (maxH - minH > 2 || maxH <= WATER_LEVEL) return;
+    const fy = maxH;
+    const set = (x, y, z, id, onlyAir) => {
+      const lx = x - x0, lz = z - z0;
+      if (lx < 0 || lx >= CHUNK || lz < 0 || lz >= CHUNK || y < 1 || y >= WORLD_H) return;
+      const i = E.blockIndex(lx, y, lz);
+      if (onlyAir && data[i] !== AIR) return;
+      data[i] = id;
+    };
+    for (let dx = -3; dx <= 3; dx++) {
+      for (let dz = -3; dz <= 3; dz++) {
+        const th2 = E.terrainHeight(hx + dx, hz + dz);
+        for (let y = th2 + 1; y <= fy; y++) set(hx + dx, y, hz + dz, DIRT, false);
+        for (let y = fy + 1; y <= fy + 4; y++) set(hx + dx, y, hz + dz, AIR, false);
+        set(hx + dx, fy, hz + dz, PLANKS, false);
+      }
+    }
+    for (let y = fy + 1; y <= fy + 3; y++) {
+      for (let dx = -3; dx <= 3; dx++) {
+        for (let dz = -3; dz <= 3; dz++) {
+          if (Math.abs(dx) !== 3 && Math.abs(dz) !== 3) continue;
+          set(hx + dx, y, hz + dz, y === fy + 1 ? COBBLE : PLANKS, false);
+        }
+      }
+    }
+    set(hx, fy + 1, hz - 3, AIR, false);
+    set(hx, fy + 2, hz - 3, AIR, false);
+    set(hx - 3, fy + 2, hz, GLASS, false);
+    set(hx + 3, fy + 2, hz, GLASS, false);
+    set(hx, fy + 2, hz + 3, GLASS, false);
+    set(hx + 2, fy + 1, hz + 2, BED, false);
+    set(hx - 2, fy + 1, hz + 2, CHEST, false);
+    set(hx - 2, fy + 3, hz - 2, TORCH, false);
+    const ck = (hx - 2) + ',' + (fy + 1) + ',' + (hz + 2);
+    if (!chestData.has(ck)) {
+      const arr = new Array(27).fill(null);
+      arr[3] = { id: PLANKS, count: 12 };
+      arr[5] = { id: 103, count: 2 };
+      arr[7] = { id: 100, count: 4 };
+      chestData.set(ck, arr);
+    }
+    villages.push([hx, fy, hz]);
   }
 
   function stampTree(data, x0, z0, wx, wz) {
@@ -671,6 +776,10 @@
     const old = ch.data[idx];
     if (old === id) return;
     ch.data[idx] = id;
+    if (id === CHEST) {
+      const ck = x + ',' + y + ',' + z;
+      if (!chestData.has(ck)) chestData.set(ck, new Array(27).fill(null));
+    }
     updateTorchRegistry(x, y, z, old, id);
     markDirty(cx, cz, lx, lz);
     scheduleWater(x, y, z);
@@ -879,6 +988,7 @@
           const isW = E.isWater(id);
           const t = isW ? wat : opq;
           let topH = 1;
+          if (b.half) topH = 0.56;
           if (isW) {
             const above = y + 1 < WORLD_H ? data[E.blockIndex(x, y + 1, z)] : AIR;
             topH = E.isWater(above) ? 1 : (E.waterLevel(id) / 8) * 0.875;
@@ -1051,8 +1161,17 @@
     } else if (!player.onGround && !player.fly && !player.inWater && player.vel.y < 0) {
       player.fallStartY = player.fallStartY === null ? player.pos.y : Math.max(player.fallStartY, player.pos.y);
     }
-    if (moveEnt(player, 0, player.vel.x * dt)) player.vel.x = 0;
-    if (moveEnt(player, 2, player.vel.z * dt)) player.vel.z = 0;
+    const hitXp = moveEnt(player, 0, player.vel.x * dt);
+    const hitZp = moveEnt(player, 2, player.vel.z * dt);
+    if (hitXp) player.vel.x = 0;
+    if (hitZp) player.vel.z = 0;
+    // sortie d'eau way Minecraft : tant que les pieds sont dans l'eau et qu'on pousse
+    // contre un bloc dont le sommet est a hauteur des pieds, on est propulse vers le haut
+    if (!player.fly && len > 0 && (hitXp || hitZp) && !player.onGround &&
+        E.isWater(getBlock(Math.floor(player.pos.x), Math.floor(player.pos.y + 0.2), Math.floor(player.pos.z))) &&
+        !E.isWater(getBlock(Math.floor(player.pos.x), Math.floor(player.pos.y + 1.2), Math.floor(player.pos.z)))) {
+      player.vel.y = Math.max(player.vel.y, 5.2);
+    }
     const hSpeed = Math.hypot(player.vel.x, player.vel.z);
     if (player.onGround && hSpeed > 0.5 && !player.fly && !player.inWater) {
       addExhaustion(dt * (sprint ? 0.5 : 0.08));
@@ -1073,6 +1192,57 @@
       player.vel.set(0, 0, 0);
       player.fallStartY = null;
     }
+  }
+
+  let armorWorn = false;
+  let sleepT = 0;
+  let toastTimer = null;
+
+  function updateArmorUI() {
+    if (armorIndEl) armorIndEl.textContent = armorWorn ? '\u{1F6E1}' : '';
+  }
+  function showToast(msg) {
+    if (!toastEl) return;
+    toastEl.textContent = msg;
+    toastEl.classList.add('visible');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.classList.remove('visible'); }, 2200);
+  }
+
+  const chestData = new Map();
+  const villages = [];
+  const chestSlotEls = [];
+  let openChestArr = null;
+  function sleepAt(x, y, z) {
+    spawnPoint.set(x + 0.5, y + 1.05, z + 0.5);
+    if (dayLight < 0.35 && gameMode === 'survival') {
+      sleepT = 1.6;
+      if (sleepFadeEl) sleepFadeEl.style.opacity = '1';
+      playSound(210, 0.5, 0.08, 'sine');
+    } else {
+      showToast(gameMode === 'creative' ? 'Point de r\u00e9apparition d\u00e9fini (cr\u00e9atif)' : 'Point de r\u00e9apparition d\u00e9fini');
+    }
+  }
+  function spillChest(x, y, z) {
+    const arr = chestData.get(x + ',' + y + ',' + z);
+    if (!arr) return;
+    for (const s of arr) if (s) addItem(s.id, Math.min(s.count, maxStack(s.id)));
+    chestData.delete(x + ',' + y + ',' + z);
+  }
+  function openChestAt(x, y, z) {
+    const k = x + ',' + y + ',' + z;
+    if (!chestData.has(k)) chestData.set(k, new Array(27).fill(null));
+    openChestArr = chestData.get(k);
+    invOpen = true;
+    invTitleEl.textContent = 'Coffre';
+    craftGridEl.classList.add('hidden');
+    resultSlotEl.classList.add('hidden');
+    chestRowEl.innerHTML = '';
+    chestSlotEls.length = 0;
+    for (let i = 0; i < 27; i++) chestSlotEls.push(makeInvSlot(chestRowEl, openChestArr, i));
+    renderInventory();
+    invEl.classList.remove('hidden');
+    if (document.pointerLockElement === canvas) document.exitPointerLock();
   }
 
   let xp = 0, xpLevel = 0;
@@ -1124,6 +1294,7 @@
 
   function damagePlayer(n, kx, kz) {
     if (gameMode === 'creative' || player.dead || player.hurtCd > 0 || player.fly) return;
+    if (armorWorn) n = Math.ceil(n * 0.65);
     player.hp -= n;
     player.hurtCd = 0.5;
     player.regenT = 0;
@@ -1155,6 +1326,8 @@
     player.regenT = 0;
     player.hurtCd = 0;
     xp = 0; xpLevel = 0;
+    armorWorn = false;
+    updateArmorUI();
     player.pos.copy(spawnPoint);
     player.vel.set(0, 0, 0);
     player.fallStartY = null;
@@ -1487,6 +1660,7 @@
           if (d > R) continue;
           const id = getBlock(bx, by, bz);
           if (id === AIR || id === BEDROCK || E.isWater(id)) continue;
+          if (id === CHEST) spillChest(bx, by, bz);
           applyBlock(bx, by, bz, AIR, true);
           broken.push([bx, by, bz, id]);
         }
@@ -1748,6 +1922,7 @@
   }
 
   function renderInventory() {
+    for (let i = 0; i < 27; i++) { if (openChestArr && chestSlotEls[i]) renderSlotContent(chestSlotEls[i], openChestArr[i]); }
     for (let i = 9; i < 36; i++) renderSlotContent(invMainSlotEls[i], inv[i]);
     for (let i = 0; i < 9; i++) renderSlotContent(invHotbarSlotEls[i], inv[i]);
     for (const cs of craftSlotEls) renderSlotContent(cs.el, craftCells[cs.i]);
@@ -1767,6 +1942,9 @@
 
   function openInventory(size) {
     craftSize = size || 2;
+    openChestArr = null;
+    craftGridEl.classList.remove('hidden');
+    resultSlotEl.classList.remove('hidden');
     invOpen = true;
     invTitleEl.textContent = craftSize === 3 ? '\u00c9tabli' : 'Inventaire';
     rebuildCraftGrid();
@@ -1790,6 +1968,9 @@
       cursorStack = null;
     }
     craftResult = null;
+    openChestArr = null;
+    craftGridEl.classList.remove('hidden');
+    resultSlotEl.classList.remove('hidden');
     invEl.classList.add('hidden');
     renderCursorStack();
     updateHotbarUI();
@@ -1848,7 +2029,7 @@
     [LEAVES]: 0.4, [GRASS]: 0.75, [DIRT]: 0.75, [SAND]: 0.75, [GRAVEL]: 0.9,
     [SNOW]: 0.6, [LOG]: 1.5, [PLANKS]: 1.5, [TABLE]: 1.5, [WOOL]: 1.0,
     [GLASS]: 0.5, [TORCH]: 0.1,
-    [FLOWER_RED]: 0.05, [FLOWER_YELLOW]: 0.05, [TALLGRASS]: 0.05,
+    [FLOWER_RED]: 0.05, [FLOWER_YELLOW]: 0.05, [TALLGRASS]: 0.05, [BED]: 0.2, [CHEST]: 1.6,
     [STONE]: 2.4, [COBBLE]: 2.4, [BRICK]: 2.4,
     [COAL_ORE]: 2.8, [IRON_ORE]: 3.2
   };
@@ -1878,6 +2059,7 @@
     return id === STONE || id === COBBLE || id === BRICK || id === COAL_ORE || id === IRON_ORE;
   }
   function breakBlockAt(x, y, z, id, canDrop) {
+    if (id === CHEST) spillChest(x, y, z);
     applyBlock(x, y, z, AIR, true);
     spawnBlockParticles(x, y, z, id);
     const bs = blockSound(id);
@@ -2042,11 +2224,12 @@
     if (gameMode === 'creative') {
       [GRASS, DIRT, STONE, SAND, LOG, LEAVES, PLANKS, COBBLE, GLASS, BRICK,
        SNOW, GRAVEL, WOOL, COAL_ORE, IRON_ORE, TABLE, TORCH,
-       FLOWER_RED, FLOWER_YELLOW, TALLGRASS].forEach((id, i) => {
+       FLOWER_RED, FLOWER_YELLOW, TALLGRASS, BED, CHEST].forEach((id, i) => {
         inv[i] = { id, count: 64 };
       });
-      inv[20] = { id: 107, count: 1 };
-      inv[21] = { id: 108, count: 1 };
+      inv[22] = { id: 107, count: 1 };
+      inv[23] = { id: 108, count: 1 };
+      inv[24] = { id: 109, count: 1 };
     }
     xp = 0; xpLevel = 0;
     updateHealthUI();
@@ -2063,6 +2246,8 @@
   }
 
   function resetWorld() {
+    villages.length = 0;
+    chestData.clear();
     for (const ch of chunks.values()) unloadChunk(ch);
     chunks.clear();
     meshQueue = [];
@@ -2254,14 +2439,29 @@
         if (inv[i] && inv[i].id === id) { selectSlot(i); return; }
       }
     } else if (e.button === 2) {
-      if (getBlock(currentHit.x, currentHit.y, currentHit.z) === TABLE) {
+      const hitId2 = getBlock(currentHit.x, currentHit.y, currentHit.z);
+      if (hitId2 === TABLE) {
         openInventory(3);
+        return;
+      }
+      if (BLOCKS[hitId2] && BLOCKS[hitId2].bed) {
+        sleepAt(currentHit.x, currentHit.y, currentHit.z);
+        return;
+      }
+      if (BLOCKS[hitId2] && BLOCKS[hitId2].chest) {
+        openChestAt(currentHit.x, currentHit.y, currentHit.z);
         return;
       }
       const held = inv[selectedSlot];
       if (!held) return;
       if (held.id >= 100) {
         const it = ITEMS[held.id];
+        if (it.armor) {
+          armorWorn = !armorWorn;
+          updateArmorUI();
+          swingT = 1;
+          playSound(360, 0.15, 0.12);
+        }
         if (it.food && player.hunger < 20) {
           player.hunger = Math.min(20, player.hunger + it.food);
           held.count--;
@@ -2353,6 +2553,15 @@
       loadingFill.style.width = Math.min(100, Math.round((done / loadingTotal) * 100)) + '%';
       if (meshQueue.length === 0) finishLoading();
     } else if (gameState === 'playing') {
+      if (sleepT > 0) {
+        sleepT -= dt;
+        if (sleepT <= 0) {
+          if (sleepFadeEl) sleepFadeEl.style.opacity = '0';
+          dayTime = 0.03;
+          updateSky();
+          showToast('Bien dormi !');
+        }
+      }
       if (document.pointerLockElement === canvas && !invOpen && !player.dead) {
         updatePlayer(dt);
         computeHit();
@@ -2432,6 +2641,14 @@
     arrows,
     addXp,
     explode: explodeAt,
+    toggleArmor(v) { armorWorn = v === undefined ? !armorWorn : !!v; updateArmorUI(); },
+    setDay(t) { dayTime = t; updateSky(); },
+    openChestAt,
+    chestData,
+    villages,
+    get openChestArr() { return openChestArr; },
+    get armorWorn() { return armorWorn; },
+    get spawnPos() { return [spawnPoint.x, spawnPoint.y, spawnPoint.z]; },
     get gameMode() { return gameMode; },
     get craftResult() { return craftResult; },
     get currentHit() { return currentHit; },
