@@ -128,11 +128,22 @@
   const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
   camera.rotation.order = 'YXZ';
 
+  let atlasCtx = null;
+
   const atlasCanvas = buildAtlas();
   const texture = new THREE.CanvasTexture(atlasCanvas);
   texture.magFilter = THREE.NearestFilter;
   texture.minFilter = THREE.NearestFilter;
   texture.generateMipmaps = false;
+
+  // couleurs moyennes des blocs (minimap)
+  const MINI_COLORS = {};
+  for (const mid0 in BLOCKS) {
+    try {
+      const c3 = tileAvgColor(+mid0);
+      MINI_COLORS[mid0] = [(c3 >> 16) & 255, (c3 >> 8) & 255, c3 & 255];
+    } catch (err) { MINI_COLORS[mid0] = [130, 130, 130]; }
+  }
 
   const chunkVert = [
     'attribute vec3 shade;',
@@ -332,6 +343,7 @@
     const cv = document.createElement('canvas');
     cv.width = SIZE; cv.height = SIZE;
     const ctx = cv.getContext('2d');
+    atlasCtx = ctx;
     const rnd = (x, y, s) => E.hash2(x + s * 131, y, 777 + s);
     const cl = (v) => Math.max(0, Math.min(255, Math.round(v)));
     const n = (amt, r) => (r * 2 - 1) * amt;
@@ -1853,6 +1865,11 @@
       hp: 4, speed: 1.5, hw: 0.21, hh: 0.72,
       body: 0xe6e6e6, head: 0xf0f0f0, leg: 0xd8a13a,
       drops: [{ id: 118, min: 0, max: 1 }], xp: 1
+    },
+    enderman: {
+      hp: 12, speed: 2.6, hw: 0.22, hh: 2.7,
+      body: 0x161016, head: 0x1a1520, leg: 0x120e12,
+      drops: [], xp: 5
     }
   };
 
@@ -1968,6 +1985,15 @@
     });
     MOBTEX.chComb = tex8((x, y) => nz(x, y, 16, [212, 62, 54], 14));
     MOBTEX.chLeg = tex8((x, y) => nz(x, y, 17, [216, 161, 58], 12));
+    MOBTEX.eSkin = tex8((x, y) => {
+      if ((x * 7 + y * 5) % 11 === 0) return [62 + ((x * 13) % 28), 34, 96]; // mouchetis violet
+      return nz(x, y, 18, [18, 16, 22], 9);
+    });
+    MOBTEX.eFace = tex8((x, y) => {
+      if (y === 2 && (x === 1 || x === 2 || x === 5 || x === 6)) return [224, 121, 250]; // yeux violets
+      if (y === 1 && (x === 1 || x === 2 || x === 5 || x === 6)) return [112, 40, 160];
+      return [14, 12, 18];
+    });
   })();
 
   function makeMobMesh(type) {
@@ -2035,6 +2061,13 @@
       part(0.06, 0.34, 0.06, T.chSkin, null, 0.24, 0.62, 0.08, -0.5);
       part(0.06, 0.3, 0.06, T.chLeg, null, -0.08, 0.15, 0);
       part(0.06, 0.3, 0.06, T.chLeg, null, 0.08, 0.15, 0);
+    } else if (type === 'enderman') {
+      part(0.44, 0.44, 0.44, T.eSkin, T.eFace, 0, 2.48, 0);
+      part(0.42, 0.85, 0.24, T.eSkin, null, 0, 1.85, 0);
+      part(0.12, 1.3, 0.12, T.eSkin, null, -0.28, 1.55, 0);
+      part(0.12, 1.3, 0.12, T.eSkin, null, 0.28, 1.55, 0);
+      part(0.12, 1.35, 0.12, T.eSkin, null, -0.11, 0.68, 0);
+      part(0.12, 1.35, 0.12, T.eSkin, null, 0.11, 0.68, 0);
     } else { // squelette
       part(0.5, 0.5, 0.5, T.bone, T.skFace, 0, 1.72, 0);
       part(0.4, 0.75, 0.16, T.ribs, null, 0, 1.1, 0);
@@ -2089,8 +2122,13 @@
     const distXZ = Math.hypot(player.pos.x - m.pos.x, player.pos.z - m.pos.z);
     m.atkT -= dt;
     m.hurtT -= dt;
+    if (m.type === 'enderman' && E.isWater(getBlock(Math.floor(m.pos.x), Math.floor(m.pos.y), Math.floor(m.pos.z)))) {
+      m.hp -= 4 * dt; // l'eau le blesse
+      m.hurtT = Math.max(m.hurtT, 0.06);
+    }
     const hostile = gameMode === 'survival' && !player.dead &&
-      (m.type === 'zombie' ? dayLight < 0.45 : m.type === 'creeper' || m.type === 'skeleton');
+      ((m.type === 'enderman' && (m.mad || dayLight < 0.45)) ||
+        (m.type === 'zombie' ? dayLight < 0.45 : m.type === 'creeper' || m.type === 'skeleton'));
     if (hostile) {
       const tDist = Math.hypot(player.pos.x - m.pos.x, player.pos.z - m.pos.z);
       m.yaw = Math.atan2(m.pos.x - player.pos.x, m.pos.z - player.pos.z);
@@ -2124,8 +2162,25 @@
         }
       } else if (m.type === 'zombie' && Math.random() < dt * 0.12) {
         playSound(55 + Math.random() * 25, 0.6, 0.07, 'sawtooth');
+      } else if (m.type === 'enderman' && Math.random() < dt * 0.06) {
+        playSound(95, 0.45, 0.08, 'sawtooth');
       }
     } else {
+      if (m.type === 'enderman' && gameMode === 'survival' && !player.dead) {
+        const ex2 = m.pos.x - player.pos.x;
+        const ey2 = (m.pos.y + 1.8) - (player.pos.y + 1.62);
+        const ez2 = m.pos.z - player.pos.z;
+        const ed2 = Math.sqrt(ex2 * ex2 + ey2 * ey2 + ez2 * ez2);
+        if (ed2 < 20) {
+          const cp2 = Math.cos(player.pitch);
+          const fdx2 = -Math.sin(player.yaw) * cp2, fdy2 = Math.sin(player.pitch), fdz2 = -Math.cos(player.yaw) * cp2;
+          const dot2 = (ex2 * fdx2 + ey2 * fdy2 + ez2 * fdz2) / (ed2 || 1);
+          if (dot2 > 0.985) {
+            if (!m.mad) playSound(60, 0.5, 0.1, 'sawtooth');
+            m.mad = true;
+          }
+        }
+      }
       m.wanderT -= dt;
       if (m.wanderT <= 0) {
         m.wanderT = 2 + Math.random() * 3;
@@ -2193,6 +2248,43 @@
     playSound(520, 0.1, 0.09, 'sine');
   }
 
+  function spawnTpParticles(x, y, z) {
+    for (let i = 0; i < 14; i++) {
+      const m = new THREE.Mesh(particleGeo, new THREE.MeshBasicMaterial({ color: 0xb76ce8 }));
+      m.position.set(x - 0.4 + Math.random() * 0.8, y - 0.2 + Math.random() * 2.2, z - 0.4 + Math.random() * 0.8);
+      scene.add(m);
+      particles.push({
+        m, life: 0.8,
+        vx: (Math.random() - 0.5) * 2.4, vy: 1.2 + Math.random() * 1.6, vz: (Math.random() - 0.5) * 2.4
+      });
+    }
+  }
+  function teleportMob(m3) {
+    spawnTpParticles(m3.pos.x, m3.pos.y, m3.pos.z);
+    for (let t3 = 0; t3 < 8; t3++) {
+      const ang3 = Math.random() * Math.PI * 2;
+      const d3 = 6 + Math.random() * 14;
+      const tx3 = Math.floor(player.pos.x + Math.cos(ang3) * d3);
+      const tz3 = Math.floor(player.pos.z + Math.sin(ang3) * d3);
+      for (let y3 = E.WORLD_H - 2; y3 >= 1; y3--) {
+        const id3 = getBlock(tx3, y3, tz3);
+        if (BLOCKS[id3] && BLOCKS[id3].solid && !BLOCKS[id3].door) {
+          const a1 = getBlock(tx3, y3 + 1, tz3), a2 = getBlock(tx3, y3 + 2, tz3);
+          if ((!a1 || !BLOCKS[a1].solid) && (!a2 || !BLOCKS[a2].solid)) {
+            m3.pos.set(tx3 + 0.5, y3 + 1.01, tz3 + 0.5);
+            m3.vel.x = 0; m3.vel.y = 0; m3.vel.z = 0;
+            spawnTpParticles(m3.pos.x, m3.pos.y, m3.pos.z);
+            playSound(720, 0.4, 0.09, 'sine');
+            playSound(360, 0.5, 0.07, 'sine');
+            return true;
+          }
+          break;
+        }
+      }
+    }
+    return false;
+  }
+
   function spawnArrow(shooter) {
     const dx = player.pos.x - shooter.pos.x, dy = (player.pos.y + 1.2) - (shooter.pos.y + 1.5),
           dz = player.pos.z - shooter.pos.z;
@@ -2242,6 +2334,12 @@
           if (hitM) break;
         }
         if (hitM) {
+          if (hitM.type === 'enderman' && !hitM.dead && hitM.hp > 0) {
+            hitM.mad = true;
+            teleportMob(hitM);
+            scene.remove(a.mesh); a.mesh.geometry.dispose(); a.mesh.material.dispose(); arrows.splice(i, 1);
+            continue;
+          }
           hitM.hp -= a.dmg || 3;
           hitM.hurtT = 0.25;
           const kx = hitM.pos.x - a.pos.x, kz = hitM.pos.z - a.pos.z, kd = Math.hypot(kx, kz) || 1;
@@ -2314,7 +2412,7 @@
     const night = dayLight < 0.45;
     if (Math.random() > (night ? 0.7 : 0.4)) return;
     const pool = night
-      ? ['zombie', 'zombie', 'skeleton', 'skeleton', 'creeper', 'pig', 'sheep']
+      ? ['zombie', 'zombie', 'skeleton', 'skeleton', 'creeper', 'pig', 'sheep', 'enderman']
       : ['pig', 'sheep', 'cow', 'cow', 'chicken'];
     const type = pool[(Math.random() * pool.length) | 0];
     let count = 0;
@@ -2893,6 +2991,9 @@
     const raw = seedInput.value.trim();
     let seed = parseInt(raw, 10);
     if (!Number.isFinite(seed) || String(seed) !== raw) seed = hashString(raw || String(Date.now()));
+    if (netState.active && netState.role === 'guest' && netState.seedOverride !== null) {
+      seed = netState.seedOverride; // le monde doit matcher celui de l'hôte
+    }
     E.setSeed(seed);
     try { localStorage.setItem('webcraft_seed', String(seed)); } catch (e) {}
     loadEdits(seed);
@@ -2992,6 +3093,7 @@
 
   function quitToMenu() {
     saveEdits();
+    if (netState.active) netPublish({ t: 'bye', from: netState.id });
     gameState = 'menu';
     pauseEl.classList.add('hidden');
     hud.classList.add('hidden');
@@ -3028,6 +3130,64 @@
         signReadEl.classList.remove('hidden');
       } else signReadEl.classList.add('hidden');
     }
+  }
+
+  // ==================== MINIMAP ====================
+  const miniCanvas = document.getElementById('minimap');
+  const mctx = miniCanvas ? miniCanvas.getContext('2d') : null;
+  const miniTemp = document.createElement('canvas');
+  miniTemp.width = 64; miniTemp.height = 64;
+  const miniCtx = miniTemp.getContext('2d');
+  let miniTimer = 0;
+  function updateMinimap() {
+    if (gameState !== 'playing' || !mctx || !miniCtx) return;
+    const px = Math.floor(player.pos.x), py = Math.floor(player.pos.y), pz = Math.floor(player.pos.z);
+    const ox = px - 32, oz = pz - 32;
+    const img = miniCtx.createImageData(64, 64);
+    const data = img.data;
+    for (let j = 0; j < 64; j++) {
+      for (let i = 0; i < 64; i++) {
+        const wx = ox + i, wz = oz + j;
+        let r = 0, g = 0, b = 0, got = false;
+        for (let y = E.WORLD_H - 2; y >= 1; y--) {
+          const id = getBlock(wx, y, wz);
+          if (!id) continue;
+          if (E.isWater(id)) { r = 26; g = 75; b = 184; }
+          else {
+            const c3 = MINI_COLORS[id] || [130, 130, 130];
+            const shade = y <= py - 6 ? 0.62 : (y >= py + 6 ? 1.18 : 0.92);
+            r = Math.min(255, c3[0] * shade); g = Math.min(255, c3[1] * shade); b = Math.min(255, c3[2] * shade);
+          }
+          got = true;
+          break;
+        }
+        const o = (j * 64 + i) * 4;
+        data[o] = r; data[o + 1] = g; data[o + 2] = b; data[o + 3] = got ? 255 : 0;
+      }
+    }
+    miniCtx.putImageData(img, 0, 0);
+    mctx.imageSmoothingEnabled = false;
+    mctx.clearRect(0, 0, 132, 132);
+    mctx.drawImage(miniTemp, 0, 0, 64, 64, 0, 0, 132, 132);
+    // points des mobs (rouge = hostile, blanc = passif)
+    if (typeof mobs !== 'undefined') {
+      for (const m of mobs) {
+        if (!m || m.dead) continue;
+        const mxp = (m.pos.x - ox) * (132 / 64), mzp = (m.pos.z - oz) * (132 / 64);
+        if (mxp < 0 || mxp > 132 || mzp < 0 || mzp > 132) continue;
+        mctx.fillStyle = (m.type === 'zombie' || m.type === 'skeleton' || m.type === 'creeper' ||
+          (m.type === 'enderman' && m.mad)) ? '#ff3d3d' : '#f5f5f5';
+        mctx.fillRect(Math.round(mxp) - 2, Math.round(mzp) - 2, 3, 3);
+      }
+    }
+    // flèche du joueur au centre (nord en haut — fillRect uniquement)
+    mctx.fillStyle = '#ffffff';
+    mctx.fillRect(64, 64, 4, 4);
+    const fdx2 = -Math.sin(player.yaw), fdz2 = -Math.cos(player.yaw);
+    mctx.fillStyle = '#ffffdd';
+    mctx.fillRect(Math.round(66 + fdx2 * 6) - 2, Math.round(66 + fdz2 * 6) - 2, 4, 4);
+    mctx.fillStyle = '#2b2b2b';
+    mctx.fillRect(Math.round(66 - fdx2 * 6) - 1, Math.round(66 - fdz2 * 6) - 1, 3, 3);
   }
 
   function updateDebug() {
@@ -3138,6 +3298,10 @@
         mob.hurtT = 0.2;
         playSound(220, 0.12, 0.14);
         mob.hp -= dmg;
+        if (mob.type === 'enderman' && !mob.dead) {
+          mob.mad = true;
+          if (Math.random() < 0.5) { teleportMob(mob); swingT = 1; return; }
+        }
         const kx = mob.pos.x - player.pos.x, kz = mob.pos.z - player.pos.z;
         const kd = Math.hypot(kx, kz) || 1;
         mob.vel.x += kx / kd * 6;
@@ -3306,6 +3470,29 @@
     if (e.key === 'Escape' || e.code === 'Escape') { e.preventDefault(); closeSignEdit(false); }
   });
   document.getElementById('btn-resume').addEventListener('click', () => canvas.requestPointerLock());
+  const btnStatsEl = document.getElementById('btn-stats');
+  if (btnStatsEl) btnStatsEl.addEventListener('click', () => { debugVisible = !debugVisible; updateDebug(); });
+  const btnOptionsEl = document.getElementById('btn-options');
+  if (btnOptionsEl) btnOptionsEl.addEventListener('click', () => {
+    document.getElementById('pause-options').classList.toggle('hidden');
+  });
+  const rdPause = document.getElementById('render-dist-pause');
+  if (rdPause) {
+    rdPause.value = String(renderDist);
+    rdPause.addEventListener('change', () => {
+      renderDist = parseInt(rdPause.value, 10) || 4;
+      if (renderDistSelect) renderDistSelect.value = String(renderDist);
+      applyRenderDistance();
+      updateChunks(true);
+    });
+  }
+  const musicPauseBtn = document.getElementById('btn-music-pause');
+  if (musicPauseBtn) {
+    musicPauseBtn.addEventListener('click', () => {
+      toggleMusic();
+      musicPauseBtn.textContent = 'Musique : ' + (musicOn ? 'ON' : 'OFF');
+    });
+  }
   document.getElementById('btn-quit').addEventListener('click', quitToMenu);
   document.getElementById('btn-respawn').addEventListener('click', respawn);
   document.getElementById('btn-reset').addEventListener('click', () => {
@@ -3442,6 +3629,8 @@
       updateHeld(dt);
       updateDebug();
       updateSignRead();
+      miniTimer -= dt;
+      if (miniTimer <= 0) { miniTimer = 0.25; updateMinimap(); }
       tickMusic(dt);
       netTick(dt);
     }
@@ -3452,7 +3641,7 @@
 
   // ==================== MULTIOUEUEUR (paresseux, isole) ====================
   const netState = {
-    active: false, role: 'solo', client: null, room: null,
+    active: false, role: 'solo', client: null, room: null, seedOverride: null,
     id: Math.random().toString(36).slice(2, 10), players: new Map(),
     outBlocks: [], posTimer: 0, joinTimer: null, joining: false
   };
@@ -3492,7 +3681,7 @@
     let p = netState.players.get(pid);
     if (!p) {
       const g = new THREE.Group();
-      const col = AV[Object.keys(netState.players).length % AV.length];
+      const col = AV[netState.players.size % AV.length];
       const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.8, 0.3), new THREE.MeshBasicMaterial({ color: col }));
       body.position.y = 1.15;
       const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({ color: 0xd8a380 }));
@@ -3528,7 +3717,11 @@
       if (netState.joinTimer) { clearTimeout(netState.joinTimer); netState.joinTimer = null; }
       modeSelect.value = msg.mode === 'creative' ? 'creative' : 'survival';
       E.setSeed(msg.seed | 0);
-      try { localStorage.setItem('webcraft_seed', String(msg.seed | 0)); } catch (e) {}
+      netState.seedOverride = msg.seed | 0;
+      try {
+        localStorage.setItem('webcraft_seed', String(msg.seed | 0));
+        seedInput.value = String(msg.seed | 0);
+      } catch (e) {}
       editsByChunk.clear();
       for (const k in (msg.edits || {})) editsByChunk.set(k, msg.edits[k]);
       try { localStorage.setItem('webcraft_edits_' + (msg.seed | 0), JSON.stringify(msg.edits || {})); } catch (e) {}
@@ -3544,7 +3737,7 @@
       upsertPlayer(msg.from, msg.name, msg.x, msg.y, msg.z, msg.yaw, msg.pitch);
     } else if (msg.t === 'blocks') {
       for (const c of (msg.changes || [])) applyBlock(c[0], c[1], c[2], c[3], false);
-      startGameFlush();
+      flushDirty();
     } else if (msg.t === 'bye') {
       const p = netState.players.get(msg.from);
       if (p) {
@@ -3555,10 +3748,6 @@
     }
   }
   let guestStartDayTime = null;
-  function startGameFlush() {
-    // re-rendit les chunks modifies par le reseau sans re-generer le monde
-    for (const ch of chunks.values()) if (ch.built) buildChunkMesh(ch);
-  }
   function startNet(role) {
     if (typeof mqtt === 'undefined') {
       netStatus('Multijoueur indisponible (mqtt.min.js manquant)', true);
@@ -3577,6 +3766,7 @@
     }
     netStatus('Connexion au serveur…');
     netState.active = true;
+    netState.role = role === 'host' ? 'host' : 'guest';
     try {
       netState.client = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
         clientId: 'webcraft_' + netState.id, keepalive: 30, reconnectPeriod: 0, connectTimeout: 10000
@@ -3675,6 +3865,7 @@
     spawnPlayerArrow,
     toggleDoorAt, doorOpen, signData, openSignEdit, closeSignEdit, throwEgg,
     toggleMusic,
+    updateMinimap, MINI_COLORS,
     get musicOn() { return musicOn; },
     netStart: (r) => startNet(r), netEnd, netOutBlock, currentNetRole, netState,
     villages,

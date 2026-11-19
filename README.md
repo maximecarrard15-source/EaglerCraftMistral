@@ -40,6 +40,9 @@ Lancer en local : double-cliquez `index.html` ou `npx serve .`
 - **Objet tenu en vue subjective** avec animation de frappe, **vibrations de marche**
   et **FOV élargi en sprint**.
 - Surbrillance du bloc visé, portée 6 blocs.
+- **Minimap circulaire** en haut à droite : terrain réel autour de toi (profondeur
+  assombrie/éclaircie), eau en bleu, **points des mobs** (rouge = hostile,
+  blanc = passif) et flèche du joueur — le Nord en haut.
 
 **Survie**
 - **Faim** : marcher/sprinter/sauter coûte de l'épuisement ; sprint bloqué sous 9 points;
@@ -62,6 +65,11 @@ Lancer en local : double-cliquez `index.html` ou `npx serve .`
   peints à la main (groin du cochon, camo du creeper, orbites du squelette), zombie
   aux bras tendus, squelette qui tient son arc.
 - Les **squelettes lâchent des flèches** à leur mort (comme dans MC).
+- **Enderman** (la nuit) : grand et noir aux yeux violets. Ne l'attaque pas
+  sans raison — **le regarder directement le met en colère** (comme dans le
+  vrai jeu), alors il fonce sur toi. Touché par une flèche, **il se téléporte**
+  (particules violettes) sans subir de dégâts ; il ne brûle pas au soleil,
+  mais **l'eau lui fait mal**.
 
 **Animaux domestiques & nourriture**
 - **Vaches** (la journée) : lâchent du bœuf cru, cuisable en **steak**.
@@ -115,6 +123,12 @@ Lancer en local : double-cliquez `index.html` ou `npx serve .`
 - **Sortie d'eau façon Minecraft** : en nageant contre un bord, vous êtes
   automatiquement propulsé hors de l'eau, même sur un bloc à la même hauteur.
 
+## Menu pause (Échap)
+
+Façon Minecraft 1.14 : le monde reste visible derrière un voile sombre.
+- **Revenir au jeu**, **Statistiques** (= écran F3), **Options…** (distance
+  d'affichage, musique) et **Sauvegarder et retourner au menu titre**.
+
 ## Commandes
 
 | Touche | Action |
@@ -142,6 +156,10 @@ Lancer en local : double-cliquez `index.html` ou `npx serve .`
   n'y touche jamais — si le serveur est injoignable, le solo fonctionne
   toujours normalement.
 - Le salon ferme la connexion quand l'hôte quitte (pas de serveur à payer).
+- **Corrigé (v9)** : l'invité ne pouvait jamais rejoindre — le rôle hôte/invité
+  n'était pas enregistré (les « hello » étaient ignorés) et l'invité générait
+  sa propre graine au lieu de celle de l'hôte. Le protocole complet est
+  vérifié par des tests (hello → welcome → graine imposée → blocs partagés → bye).
 
 ## Technique
 
@@ -165,10 +183,13 @@ a été recréé de zéro pixel par pixel en reprenant les codes visuels emblém
 ## Vérification
 
 Suite de tests sans navigateur : `node /tmp/smoke.js` (harnais VM Node) —
-78 contrôles : moteur, grottes, biomes, craft, minage/délais, drops, faim/regen,
+98 contrôles : moteur, grottes, biomes, craft, minage/délais, drops, faim/regen,
 explosions, squelettes/flèches, XP, sable, jour/nuit, mobs, particules,
 sortie d'eau, lit/dormir, armure, coffres persistants, villages,
 four (fabrication, fusion, jauges), infobulle des noms, arc (tir, dégâts,
 kill avec butin et XP), flèches des squelettes,
 **portes (craft, pose en paire, ouverture/collision), pancartes (texte),
-vaches/poules, seau/lait/œufs lançables, sprint sur R, multijoueur isolé**.
+vaches/poules, seau/lait/œufs lançables, sprint sur R, multijoueur complet
+(poignée de main hôte/invité, graine imposée, blocs partagés),
+minimap (couleurs + mise à jour), enderman (spawn, aggro par le regard,
+aggro en mélée/fleche → téléportation)**.

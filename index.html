@@ -14,6 +14,7 @@
 <div id="damage-flash"></div>
 
 <div id="hud" class="hidden">
+  <div id="minimap-wrap"><canvas id="minimap" width="132" height="132"></canvas><span id="minimap-n">N</span></div>
   <div id="crosshair"></div>
   <div id="break-bar" class="hidden"><div id="break-fill"></div></div>
   <div id="debug" class="hidden"></div>
@@ -88,11 +89,25 @@
   </div>
 </div>
 
-<div id="pause" class="overlay dirt-bg hidden">
-  <div class="panel">
-    <h2>Jeu en pause</h2>
-    <button id="btn-resume" class="mc-btn">Reprendre</button>
-    <button id="btn-quit" class="mc-btn secondary">Sauvegarder et quitter</button>
+<div id="pause" class="overlay hidden">
+  <div class="pause-panel">
+    <h2 class="pause-title">Menu du jeu</h2>
+    <button id="btn-resume" class="mc-btn">Revenir au jeu</button>
+    <button id="btn-stats" class="mc-btn">Statistiques</button>
+    <button id="btn-options" class="mc-btn secondaire2">Options…</button>
+    <button id="btn-quit" class="mc-btn">Sauvegarder et retourner au menu</button>
+    <div id="pause-options" class="hidden">
+      <label>Distance d'affichage
+        <select id="render-dist-pause">
+          <option value="2">2 chunks — rapide</option>
+          <option value="3">3 chunks</option>
+          <option value="4" selected>4 chunks</option>
+          <option value="5">5 chunks</option>
+          <option value="6">6 chunks — chargé</option>
+        </select>
+      </label>
+      <button id="btn-music-pause" class="mc-btn">Musique : ON</button>
+    </div>
   </div>
 </div>
 

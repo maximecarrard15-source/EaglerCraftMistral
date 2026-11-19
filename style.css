@@ -451,3 +451,72 @@ input, select {
 @media (max-width: 700px) {
   #mp-box .mp-row { flex-wrap: wrap; }
 }
+
+/* ===== v6 : pause façon Minecraft ===== */
+#pause { background: rgba(0, 0, 0, 0.55); }
+#pause .pause-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  align-items: stretch;
+  width: 320px;
+  max-width: 88vw;
+}
+#pause .pause-title {
+  text-align: center;
+  font-size: 17px;
+  color: #dcdcdc;
+  margin: 0 0 10px;
+  text-shadow: 2px 2px 0 #3f3f3f;
+}
+#pause .mc-btn { width: 100%; }
+#pause .mc-btn.secondaire2 { opacity: 0.92; }
+#pause-options {
+  margin-top: 8px;
+  border-top: 2px solid #444;
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+#pause-options label { color: #d8d8d8; font-size: 13px; }
+#pause-options select {
+  width: 100%;
+  padding: 6px;
+  background: #0e0e0e;
+  color: #fff;
+  border: 2px solid #565656;
+  font-size: 13px;
+}
+
+/* ===== v6 : minimap ===== */
+#minimap-wrap {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 132px;
+  height: 132px;
+  border: 3px solid #1c1c1c;
+  outline: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  overflow: hidden;
+  background: #0a0a12;
+  z-index: 10;
+}
+#minimap {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  display: block;
+}
+#minimap-n {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  font-size: 10px;
+  font-weight: bold;
+  text-shadow: 1px 1px 0 #000;
+  z-index: 11;
+}
