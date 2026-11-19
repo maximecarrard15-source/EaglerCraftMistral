@@ -363,3 +363,18 @@ input, select {
 #armor-ind{position:fixed;left:50%;transform:translateX(-50%);bottom:106px;font-size:18px;display:none;z-index:15;}
 #inv-chest-row{display:grid;grid-template-columns:repeat(9,54px);gap:4px;margin-bottom:8px;justify-content:center;}
 #inv-chest-row.hidden{display:none;}
+
+/* --- Wave 4 : four + infobulle items --- */
+#furnace-row{display:flex;align-items:center;gap:18px;margin-bottom:8px;justify-content:center;}
+#furnace-row.hidden{display:none;}
+.furn-col{display:flex;flex-direction:column;align-items:center;gap:4px;}
+.furn-slot{width:54px;height:54px;}
+.furn-mid{display:flex;align-items:center;gap:10px;}
+.f-flame{font-size:18px;min-width:24px;text-align:center;}
+.f-prog{width:70px;height:10px;background:#2a2a2a;border:1px solid #555;}
+.f-prog-fill{height:100%;background:#eaeaea;width:0%;}
+.f-burn{width:26px;height:8px;background:#181818;border:1px solid #555;}
+.f-burn-fill{height:100%;background:#f08020;width:0%;}
+#item-tip{position:fixed;display:block;background:rgba(14,2,20,.94);color:#fff;padding:4px 9px;font-size:13px;
+  border:2px solid #2d0a63;outline:1px solid #0f0f12;pointer-events:none;z-index:60;white-space:nowrap;font-family:inherit;}
+#item-tip.hidden{display:none;}

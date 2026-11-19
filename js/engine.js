@@ -10,7 +10,7 @@
         SNOW = 13, GRAVEL = 14, WOOL = 15, COAL_ORE = 16, IRON_ORE = 17,
         TABLE = 18, TORCH = 19,
         FLOWER_RED = 20, FLOWER_YELLOW = 21, TALLGRASS = 22,
-        BED = 23, CHEST = 24;
+        BED = 23, CHEST = 24, FURNACE = 25;
 
   const BLOCKS = {
     [GRASS]:    { name: 'Herbe',            top: 0,  bottom: 2,  side: 1,  opaque: true,  solid: true },
@@ -36,6 +36,7 @@
     [FLOWER_YELLOW]: { name: 'Pissenlit',     top: 32, bottom: 32, side: 32, opaque: false, solid: false, plant: true },
     [TALLGRASS]:     { name: 'Herbe haute',   top: 33, bottom: 33, side: 33, opaque: false, solid: false, plant: true },
     [BED]:           { name: 'Lit',           top: 34, bottom: 35, side: 35, opaque: false, solid: false, bed: true, half: true },
+    [FURNACE]:  { name: 'Four',             top: 39, bottom: 39, side: 41, opaque: true, solid: true, furnace: true },
     [CHEST]:         { name: 'Coffre',        top: 37, bottom: 36, side: 36, opaque: true,  solid: true, chest: true }
   };
 
@@ -221,7 +222,7 @@
     CHUNK, WORLD_H, WATER_LEVEL, ATLAS_COLS,
     AIR, GRASS, DIRT, STONE, SAND, LOG, LEAVES, WATER, PLANKS, COBBLE,
     GLASS, BRICK, BEDROCK, SNOW, GRAVEL, WOOL, COAL_ORE, IRON_ORE, TABLE, TORCH,
-    FLOWER_RED, FLOWER_YELLOW, TALLGRASS, BED, CHEST,
+    FLOWER_RED, FLOWER_YELLOW, TALLGRASS, BED, CHEST, FURNACE,
     BLOCKS, FACES,
     setSeed, getSeed, hash2, hash3, noise2, fbm,
     terrainHeight, surfaceBlock, oreAt, treeAt, blockIndex, faceVisible, raycast,

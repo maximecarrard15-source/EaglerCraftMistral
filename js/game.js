@@ -10,19 +10,23 @@
         WOOL = E.WOOL, COAL_ORE = E.COAL_ORE, IRON_ORE = E.IRON_ORE,
         TABLE = E.TABLE, TORCH = E.TORCH,
         FLOWER_RED = E.FLOWER_RED, FLOWER_YELLOW = E.FLOWER_YELLOW, TALLGRASS = E.TALLGRASS,
-        BED = E.BED, CHEST = E.CHEST;
+        BED = E.BED, CHEST = E.CHEST, FURNACE = E.FURNACE;
 
   const ITEMS = {
-    100: { name: 'Charbon', tile: 22 },
-    101: { name: 'Bâton', tile: 23 },
+    100: { name: 'Charbon', tile: 22, fuel: 8 },
+    101: { name: 'Bâton', tile: 23, fuel: 0.5 },
     102: { name: 'Épée en bois', tile: 24, sword: 2, maxStack: 1 },
-    103: { name: 'Porc', tile: 25, food: 4 },
-    104: { name: 'Mouton', tile: 26, food: 4 },
-    105: { name: 'Fer', tile: 27 },
+    103: { name: 'Porc cru', tile: 25, food: 3 },
+    104: { name: 'Mouton cru', tile: 26, food: 2 },
+    105: { name: 'Lingot de fer', tile: 27 },
     106: { name: 'Épée en fer', tile: 28, sword: 3, maxStack: 1 },
     107: { name: 'Pioche en bois', tile: 29, pick: 2.6, maxStack: 1 },
     109: { name: 'Plastron en fer', tile: 38, armor: 5, maxStack: 1 },
-    108: { name: 'Pioche en fer', tile: 30, pick: 4.5, maxStack: 1 }
+    108: { name: 'Pioche en fer', tile: 30, pick: 4.5, maxStack: 1 },
+    110: { name: 'Porc cuit', tile: 44, food: 8 },
+    111: { name: 'Mouton cuit', tile: 45, food: 6 },
+    112: { name: 'Flèche', tile: 42 },
+    113: { name: 'Arc', tile: 43, bow: true, maxStack: 1 }
   };
 
   function trimShape(shape) {
@@ -47,8 +51,14 @@
     { shape: [[PLANKS, PLANKS, PLANKS], [null, 101, null], [null, 101, null]], out: { id: 107, count: 1 } },
     { shape: [[105, 105, 105], [null, 101, null], [null, 101, null]], out: { id: 108, count: 1 } },
     { shape: [[WOOL, WOOL, WOOL], [PLANKS, PLANKS, PLANKS]], out: { id: BED, count: 1 } },
-    { shape: [[105, null, 105], [105, 105, 105], [105, 105, 105]], out: { id: 109, count: 1 } }
+    { shape: [[105, null, 105], [105, 105, 105], [105, 105, 105]], out: { id: 109, count: 1 } },
+    { shape: [[COBBLE, COBBLE, COBBLE], [COBBLE, 0, COBBLE], [COBBLE, COBBLE, COBBLE]], out: { id: FURNACE, count: 1 } },
+    { shape: [[0, 101, WOOL], [0, 101, 0], [0, 101, WOOL]], out: { id: 113, count: 1 } },
+    { shape: [[GRAVEL], [101], [WOOL]], out: { id: 112, count: 4 } }
   ].map((r) => ({ rows: trimShape(r.shape).map((row) => row.map((c) => c || 0)), out: r.out }));
+
+  const SMELT = { [IRON_ORE]: 105, [SAND]: GLASS, [COBBLE]: STONE, 103: 110, 104: 111 };
+  const FUEL = { 100: 8, [LOG]: 1.5, [PLANKS]: 1.5, 101: 0.5, [WOOL]: 0.25 };
 
   const GRAVITY = 30, JUMP_V = 8.8, WALK_SPEED = 4.4, SPRINT_MULT = 1.55,
         FLY_SPEED = 11, MAX_FALL = 55;
@@ -95,6 +105,8 @@
   const toastEl = document.getElementById('toast');
   const armorIndEl = document.getElementById('armor-ind');
   const chestRowEl = document.getElementById('inv-chest-row');
+  const furnaceRowEl = document.getElementById('furnace-row');
+  let furnProgFillEl = null, furnBurnFillEl = null, furnFlameEl = null;
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -442,67 +454,123 @@
       const m = n(6, r);
       return [231 + weave + m, 233 + weave + m, 235 + weave + m];
     });
-    // --- items ---
-    tile(22, (x, y, r) => {
-      const d = Math.abs(x - 8) + Math.abs(y - 8);
-      if (d > 6) return [0, 0, 0, 0];
-      const m = n(10, r);
-      return d < 3 && x < 8 ? [95 + m, 95 + m, 100 + m] : [35 + m, 35 + m, 38 + m];
+    // --- items (redessinés, lisibles) ---
+    tile(22, (x, y, r) => { // Charbon
+      const dx = Math.abs(x - 8), dy = Math.abs(y - 8);
+      const d = dx * 0.85 + dy + (E.hash2(x, y, 5) < 0.3 ? 1 : 0);
+      if (d > 5.4) return [0, 0, 0, 0];
+      const m = n(6, r);
+      const facet = (x + y) < 11 ? 30 : (x - y > 2 ? -12 : 0);
+      return [36 + facet * 0.55 + m, 36 + facet * 0.55 + m, 42 + facet * 0.62 + m];
     });
-    tile(23, (x, y, r) => {
-      const d = Math.abs((15 - y) - x);
-      if (d > 1 || x < 3 || x > 12) return [0, 0, 0, 0];
-      const m = n(10, r);
-      return [146 + m, 106 + m, 60 + m];
-    });
-    tile(24, (x, y, r) => {
+    tile(23, (x, y, r) => { // Bâton
       const d = x - (15 - y);
-      if (d < -1 || d > 2 || x < 6) return [0, 0, 0, 0];
-      if (x < 9) { const m = n(10, r); return [104 + m, 82 + m, 50 + m]; }
+      if (Math.abs(d) > 1 || x < 3 || x > 12) return [0, 0, 0, 0];
       const m = n(8, r);
-      return [172 + m, 134 + m, 80 + m];
+      const hi = d === -1 ? 26 : (d === 1 ? -18 : 0);
+      return [136 + hi + m, 98 + hi + m, 58 + hi + m];
     });
-    tile(25, (x, y, r) => {
-      const d = Math.abs(x - 8) + Math.abs(y - 8);
-      if (d > 6) return [0, 0, 0, 0];
-      const m = n(10, r);
-      return d < 3 ? [250 + m, 190 + m, 178 + m] : [240 + m, 150 + m, 140 + m];
+    const swordArt = (blade) => (x, y, r) => {
+      const d = x - (15 - y);
+      if (Math.abs(d) > 2 || x < 3 || x > 14) return [0, 0, 0, 0];
+      const m = n(6, r);
+      if (x >= 8) { // lame
+        const edge = d === 2 ? -30 : (d === 1 ? -12 : 8);
+        return [blade[0] + edge + m, blade[1] + edge + m, blade[2] + edge + m];
+      }
+      if ((x === 6 || x === 7) && Math.abs(d) <= 3) return [102 + m, 74 + m, 40 + m]; // garde
+      if (x <= 5 && Math.abs(d) <= 1) return [126 + m, 88 + m, 46 + m]; // poignée
+      return [0, 0, 0, 0];
+    };
+    tile(24, swordArt([170, 134, 80])); // épée bois
+    tile(28, swordArt([224, 228, 234])); // épée fer
+    tile(25, (x, y, r) => { // Porc cru
+      const dx = (x - 8) / 5.4, dy = (y - 8) / 5.9;
+      if (dx * dx + dy * dy > 1) return [0, 0, 0, 0];
+      const m = n(8, r);
+      if (x < 6 && y > 10) return [244 + m, 236 + m, 224 + m]; // os
+      return (y < 6 || x > 10) ? [248 + m, 196 + m, 186 + m] : [240 + m, 150 + m, 140 + m];
     });
-    tile(26, (x, y, r) => {
-      const d = Math.abs(x - 8) + Math.abs(y - 8);
-      if (d > 6) return [0, 0, 0, 0];
-      const m = n(10, r);
-      return d < 2 ? [250 + m, 168 + m, 152 + m] : [228 + m, 116 + m, 100 + m];
+    tile(26, (x, y, r) => { // Mouton cru
+      const dx = (x - 8) / 5.4, dy = (y - 8) / 5.9;
+      if (dx * dx + dy * dy > 1) return [0, 0, 0, 0];
+      const m = n(8, r);
+      if (x < 6 && y > 10) return [244 + m, 236 + m, 224 + m];
+      return (y < 6 || x > 10) ? [236 + m, 150 + m, 132 + m] : [210 + m, 90 + m, 74 + m];
     });
-    tile(27, (x, y, r) => {
-      if (y < 6 || y > 10 || x < 2 || x > 13) return [0, 0, 0, 0];
+    tile(27, (x, y, r) => { // Lingot de fer
+      if (y < 5 || y > 11) return [0, 0, 0, 0];
+      const lim = 2 + Math.floor((y - 5) * 0.55);
+      if (Math.abs(x - 8) > lim) return [0, 0, 0, 0];
+      const m = n(5, r);
+      let v = [202, 206, 214];
+      if (y <= 6) v = [238, 240, 246];
+      else if (y >= 10) v = [168, 172, 182];
+      return [v[0] + m, v[1] + m, v[2] + m];
+    });
+    const pickArt = (head) => (x, y, r) => {
+      const d = x - (15 - y);
       const m = n(7, r);
-      return y === 10 ? [182 + m, 182 + m, 188 + m] : [218 + m, 218 + m, 224 + m];
+      const headOn = (y >= 2 && y <= 4 && x >= 5 && x <= 13) ||
+        (x >= 12 && x <= 13 && y >= 3 && y <= 9) ||
+        (x >= 5 && x <= 6 && y >= 2 && y <= 5);
+      if (!headOn) {
+        if (Math.abs(d) <= 1 && x >= 3 && x <= 10) return [126 + m, 92 + m, 50 + m]; // manche
+        return [0, 0, 0, 0];
+      }
+      const edge = (y === 2 || x === 13) ? -24 : 0;
+      return [head[0] + edge + m, head[1] + edge + m, head[2] + edge + m];
+    };
+    tile(29, pickArt([172, 134, 78]));  // pioche bois
+    tile(30, pickArt([218, 220, 226])); // pioche fer
+    tile(39, (x, y, r) => { // four : dessus
+      const rim = x < 2 || x > 13 || y < 2 || y > 13;
+      const m = n(7, r);
+      return rim ? [88 + m, 86 + m, 86 + m] : [122 + m, 120 + m, 120 + m];
     });
-    tile(28, (x, y, r) => {
-      const d = x - (15 - y);
-      if (d < -1 || d > 2 || x < 6) return [0, 0, 0, 0];
-      if (x < 9) { const m = n(10, r); return [104 + m, 82 + m, 50 + m]; }
+    tile(40, (x, y, r) => { const m = n(8, r); return [110 + m, 108 + m, 108 + m]; }); // (réserve)
+    tile(41, (x, y, r) => { // four : face/côtés (bouche + braises)
+      if (x === 0 || y === 0 || x === 15 || y === 15) { const m = n(5, r); return [70 + m, 68 + m, 68 + m]; }
+      if (x > 3 && x < 12 && y > 4 && y < 12) {
+        if (y > 9) { const m = n(16, r); return y > 10 ? [206 + m, 112 + m, 30 + m] : [128 + m, 44 + m, 12 + m]; }
+        return [26 + n(4, r), 22 + n(4, r), 22 + n(4, r)];
+      }
       const m = n(8, r);
-      return [222 + m, 226 + m, 232 + m];
+      return [108 + m, 106 + m, 106 + m];
     });
-    tile(29, (x, y, r) => {
-      const dH = (15 - y) - x;
-      const head = (y >= 2 && y <= 4 && x >= 3 && x <= 12) ||
-        ((x === 3 || x === 4) && y >= 5 && y <= 7) ||
-        ((x === 11 || x === 12) && y >= 5 && y <= 7);
-      if (dH >= -1 && dH <= 1 && x >= 4 && x <= 11) return [104 + n(10, r), 82 + n(10, r), 50 + n(8, r)];
-      if (head) return [170 + n(8, r), 134 + n(8, r), 80 + n(8, r)];
+    tile(42, (x, y, r) => { // Flèche
+      const d = x - (15 - y);
+      if (x >= 10) {
+        if (Math.abs(d) <= 2 && y <= 7) { const m = n(8, r); return d === 2 ? [122 + m, 122 + m, 128 + m] : [170 + m, 170 + m, 178 + m]; }
+        return [0, 0, 0, 0];
+      }
+      if (x <= 5) {
+        if (y >= 9 && Math.abs(d) <= 3) { const m = n(6, r); return d === 0 ? [242 + m, 242 + m, 246 + m] : [214 + m, 216 + m, 222 + m]; }
+        return [0, 0, 0, 0];
+      }
+      if (Math.abs(d) <= 1 && y >= 3 && y <= 13) { const m = n(8, r); return [124 + m, 92 + m, 52 + m]; }
       return [0, 0, 0, 0];
     });
-    tile(30, (x, y, r) => {
-      const dH = (15 - y) - x;
-      const head = (y >= 2 && y <= 4 && x >= 3 && x <= 12) ||
-        ((x === 3 || x === 4) && y >= 5 && y <= 7) ||
-        ((x === 11 || x === 12) && y >= 5 && y <= 7);
-      if (dH >= -1 && dH <= 1 && x >= 4 && x <= 11) return [104 + n(10, r), 82 + n(10, r), 50 + n(8, r)];
-      if (head) return [216 + n(8, r), 220 + n(8, r), 226 + n(8, r)];
+    tile(43, (x, y, r) => { // Arc (crosse à droite, corde à gauche)
+      const dx = x - 5, dy = y - 8;
+      const rr = Math.sqrt(dx * dx + dy * dy);
+      if (x >= 6 && rr >= 6.1 && rr <= 7.6) { const m = n(9, r); return y > 6 && y < 10 ? [92 + m, 64 + m, 34 + m] : [118 + m, 84 + m, 44 + m]; }
+      if (x === 5 && y >= 2 && y <= 13) { const m = n(4, r); return [218 + m, 218 + m, 222 + m]; }
       return [0, 0, 0, 0];
+    });
+    tile(44, (x, y, r) => { // Porc cuit
+      const dx = (x - 8) / 5.4, dy = (y - 8) / 5.9;
+      if (dx * dx + dy * dy > 1) return [0, 0, 0, 0];
+      const m = n(8, r);
+      if (x < 6 && y > 10) return [240 + m, 232 + m, 220 + m];
+      return (y < 6 || x > 10) ? [226 + m, 168 + m, 98 + m] : [196 + m, 124 + m, 62 + m];
+    });
+    tile(45, (x, y, r) => { // Mouton cuit
+      const dx = (x - 8) / 5.4, dy = (y - 8) / 5.9;
+      if (dx * dx + dy * dy > 1) return [0, 0, 0, 0];
+      const m = n(8, r);
+      if (x < 6 && y > 10) return [240 + m, 232 + m, 220 + m];
+      return (y < 6 || x > 10) ? [204 + m, 130 + m, 92 + m] : [164 + m, 88 + m, 60 + m];
     });
     // --- plantes ---
     tile(31, (x, y, r) => {
@@ -1213,6 +1281,11 @@
   const villages = [];
   const chestSlotEls = [];
   let openChestArr = null;
+  const furnaceData = new Map();
+  let openFurnaceKey = null;
+  const furnSlotEls = { inp: null, fuel: null, out: null };
+  const SMELT_TIME = 6;
+  let bowCharging = false, bowT = 0;
   function sleepAt(x, y, z) {
     spawnPoint.set(x + 0.5, y + 1.05, z + 0.5);
     if (dayLight < 0.35 && gameMode === 'survival') {
@@ -1229,6 +1302,65 @@
     for (const s of arr) if (s) addItem(s.id, Math.min(s.count, maxStack(s.id)));
     chestData.delete(x + ',' + y + ',' + z);
   }
+  function furnaceAt(x, y, z) {
+    const k = x + ',' + y + ',' + z;
+    if (!furnaceData.has(k)) furnaceData.set(k, { inpA: [null], fuelA: [null], outA: [null], progress: 0, burn: 0, burnMax: 0 });
+    return furnaceData.get(k);
+  }
+  function spillFurnace(x, y, z) {
+    const f = furnaceData.get(x + ',' + y + ',' + z);
+    if (!f) return;
+    for (const a of [f.inpA, f.fuelA, f.outA]) if (a[0]) addItem(a[0].id, Math.min(a[0].count, maxStack(a[0].id)));
+    furnaceData.delete(x + ',' + y + ',' + z);
+  }
+  function canSmelt(f) {
+    const inp = f.inpA[0], out = f.outA[0];
+    if (!inp || !(inp.id in SMELT)) return false;
+    const res = SMELT[inp.id];
+    return !out || (out.id === res && out.count < maxStack(res));
+  }
+  function tickFurnaces(dt) {
+    let changed = false;
+    for (const f of furnaceData.values()) {
+      if (f.burn > 0) f.burn -= dt;
+      if (canSmelt(f)) {
+        if (f.burn <= 0 && f.fuelA[0] && ITEMS[f.fuelA[0].id] && ITEMS[f.fuelA[0].id].fuel) {
+          f.burnMax = ITEMS[f.fuelA[0].id].fuel;
+          f.burn = f.burnMax;
+          f.fuelA[0].count -= 1;
+          if (f.fuelA[0].count <= 0) f.fuelA[0] = null;
+          changed = true;
+        }
+        if (f.burn > 0) {
+          f.progress += dt;
+          if (f.progress >= SMELT_TIME) {
+            f.progress = 0;
+            const res = SMELT[f.inpA[0].id];
+            if (f.outA[0]) f.outA[0].count += 1;
+            else f.outA[0] = { id: res, count: 1 };
+            f.inpA[0].count -= 1;
+            if (f.inpA[0].count <= 0) f.inpA[0] = null;
+            playSound(210, 0.25, 0.05, 'sawtooth');
+            changed = true;
+          }
+        }
+      } else {
+        f.progress = 0;
+      }
+    }
+    if (openFurnaceKey) {
+      updateFurnaceUI();
+      if (changed) renderInventory();
+    }
+  }
+  function updateFurnaceUI() {
+    const f = openFurnaceKey ? furnaceData.get(openFurnaceKey) : null;
+    if (!f) return;
+    if (furnProgFillEl) furnProgFillEl.style.width = Math.round(Math.min(1, f.progress / SMELT_TIME) * 100) + '%';
+    if (furnBurnFillEl) furnBurnFillEl.style.width = (f.burnMax > 0 ? Math.round(Math.max(0, f.burn / f.burnMax) * 100) : 0) + '%';
+    if (furnFlameEl) furnFlameEl.textContent = f.burn > 0 ? '\u{1F525}' : ' ';
+  }
+
   function openChestAt(x, y, z) {
     const k = x + ',' + y + ',' + z;
     if (!chestData.has(k)) chestData.set(k, new Array(27).fill(null));
@@ -1237,9 +1369,56 @@
     invTitleEl.textContent = 'Coffre';
     craftGridEl.classList.add('hidden');
     resultSlotEl.classList.add('hidden');
+    if (furnaceRowEl) furnaceRowEl.classList.add('hidden');
     chestRowEl.innerHTML = '';
     chestSlotEls.length = 0;
     for (let i = 0; i < 27; i++) chestSlotEls.push(makeInvSlot(chestRowEl, openChestArr, i));
+    renderInventory();
+    invEl.classList.remove('hidden');
+    if (document.pointerLockElement === canvas) document.exitPointerLock();
+  }
+
+  function openFurnaceAt(x, y, z) {
+    const k = x + ',' + y + ',' + z;
+    furnaceAt(x, y, z);
+    openFurnaceKey = k;
+    openChestArr = null;
+    invOpen = true;
+    invTitleEl.textContent = 'Four';
+    craftGridEl.classList.add('hidden');
+    resultSlotEl.classList.add('hidden');
+    chestRowEl.classList.add('hidden');
+    chestRowEl.innerHTML = '';
+    const f = furnaceData.get(k);
+    // colonne gauche : entrée / flamme / combustible — milieu : progression — droite : résultat
+    furnaceRowEl.innerHTML = '';
+    furnaceRowEl.classList.remove('hidden');
+    const colL = document.createElement('div');
+    colL.className = 'furn-col';
+    const wInp = document.createElement('div'); wInp.className = 'furn-slot';
+    furnSlotEls.inp = makeInvSlot(wInp, f.inpA, 0);
+    const burn = document.createElement('div'); burn.className = 'f-burn';
+    furnBurnFillEl = document.createElement('div'); furnBurnFillEl.className = 'f-burn-fill';
+    burn.appendChild(furnBurnFillEl);
+    const wFuel = document.createElement('div'); wFuel.className = 'furn-slot';
+    furnSlotEls.fuel = makeInvSlot(wFuel, f.fuelA, 0);
+    colL.appendChild(wInp); colL.appendChild(burn); colL.appendChild(wFuel);
+    const mid = document.createElement('div');
+    mid.className = 'furn-mid';
+    furnFlameEl = document.createElement('span'); furnFlameEl.className = 'f-flame';
+    const prog = document.createElement('div'); prog.className = 'f-prog';
+    furnProgFillEl = document.createElement('div'); furnProgFillEl.className = 'f-prog-fill';
+    prog.appendChild(furnProgFillEl);
+    mid.appendChild(furnFlameEl); mid.appendChild(prog);
+    const colR = document.createElement('div');
+    colR.className = 'furn-col';
+    const wOut = document.createElement('div'); wOut.className = 'furn-slot';
+    furnSlotEls.out = makeInvSlot(wOut, f.outA, 0);
+    colR.appendChild(wOut);
+    furnaceRowEl.appendChild(colL);
+    furnaceRowEl.appendChild(mid);
+    furnaceRowEl.appendChild(colR);
+    updateFurnaceUI();
     renderInventory();
     invEl.classList.remove('hidden');
     if (document.pointerLockElement === canvas) document.exitPointerLock();
@@ -1442,52 +1621,154 @@
     skeleton: {
       hp: 6, speed: 1.9, hw: 0.3, hh: 1.9,
       body: 0xbfbfbf, head: 0xe4e4e4, leg: 0xa9a9a9,
-      drops: [], xp: 5
+      drops: [{ id: 112, min: 0, max: 2 }], xp: 5
     }
   };
 
+  // --- textures de mobs (peintes à la main, style MC) ---
+  const MOBTEX = {};
+  (function () {
+    function tex8(paint) {
+      const cv = document.createElement('canvas');
+      cv.width = 8; cv.height = 8;
+      const c = cv.getContext('2d');
+      const img = c.createImageData(8, 8);
+      for (let y = 0; y < 8; y++) {
+        for (let x = 0; x < 8; x++) {
+          const px = paint(x, y);
+          const o = (y * 8 + x) * 4;
+          img.data[o] = Math.max(0, Math.min(255, px[0]));
+          img.data[o + 1] = Math.max(0, Math.min(255, px[1]));
+          img.data[o + 2] = Math.max(0, Math.min(255, px[2]));
+          img.data[o + 3] = 255;
+        }
+      }
+      c.putImageData(img, 0, 0);
+      const t = new THREE.CanvasTexture(cv);
+      t.magFilter = THREE.NearestFilter;
+      return t;
+    }
+    const nz = (x, y, s, base, amt) => {
+      const m = (E.hash2(x * 3 + s * 97, y * 7, 901 + s) - 0.5) * amt;
+      return [base[0] + m, base[1] + m, base[2] + m];
+    };
+    const CAMO = [[44, 110, 38], [58, 140, 48], [72, 162, 56], [30, 82, 28]];
+    MOBTEX.pigSkin = tex8((x, y) => nz(x, y, 1, [238, 163, 160], 16));
+    MOBTEX.pigLeg = tex8((x, y) => nz(x, y, 2, [226, 138, 136], 12));
+    MOBTEX.pigFace = tex8((x, y) => {
+      if (x >= 2 && x <= 5 && y >= 4 && y <= 6) {
+        if ((x === 2 || x === 5) && y >= 4 && y <= 5) return [180, 84, 82];
+        return [248, 196, 188];
+      }
+      if ((x === 1 && y === 2) || (x === 6 && y === 2)) return [252, 252, 252];
+      if ((x === 1 && y === 3) || (x === 6 && y === 3)) return [42, 36, 40];
+      return nz(x, y, 1, [238, 163, 160], 16);
+    });
+    MOBTEX.wool = tex8((x, y) => {
+      const wv = ((x + (y >> 1)) % 2) ? 8 : -8;
+      return nz(x, y, 3, [230 + wv, 231 + wv, 233 + wv], 10);
+    });
+    MOBTEX.sheepSkin = tex8((x, y) => nz(x, y, 4, [224, 210, 192], 10));
+    MOBTEX.sheepFace = tex8((x, y) => {
+      if (x === 0 || x === 7 || y === 0) return nz(x, y, 3, [230, 231, 233], 10); // laine
+      if ((x === 1 && y === 2) || (x === 6 && y === 2)) return [30, 26, 30];
+      if (x >= 3 && x <= 4 && y === 5) return [188, 122, 122];
+      return nz(x, y, 4, [224, 210, 192], 10);
+    });
+    MOBTEX.zSkin = tex8((x, y) => nz(x, y, 5, [96, 158, 88], 18));
+    MOBTEX.zShirt = tex8((x, y) => nz(x, y, 6, [56, 124, 134], 14));
+    MOBTEX.zPants = tex8((x, y) => nz(x, y, 7, [68, 82, 156], 12));
+    MOBTEX.zFace = tex8((x, y) => {
+      if ((x === 1 || x === 2) && y === 3) return [18, 22, 18];
+      if ((x === 5 || x === 6) && y === 3) return [18, 22, 18];
+      if ((x === 3 || x === 4) && y === 5) return [30, 40, 30];
+      return nz(x, y, 5, [96, 158, 88], 18);
+    });
+    MOBTEX.creeperSkin = tex8((x, y) => {
+      const c = CAMO[Math.floor(E.hash2(x >> 1, y >> 1, 4242) * 4) % 4];
+      return [c[0] + (E.hash2(x, y, 43) - 0.5) * 10, c[1] + (E.hash2(x, y, 44) - 0.5) * 10, c[2] + (E.hash2(x, y, 45) - 0.5) * 10];
+    });
+    MOBTEX.creeperFace = tex8((x, y) => {
+      const inMouth = ((x === 3 || x === 4) && y >= 4 && y <= 7) || ((x === 2 || x === 5) && y >= 5 && y <= 6);
+      if (inMouth) return [12, 14, 12];
+      if ((x === 1 || x === 2) && y >= 2 && y <= 3) return [12, 14, 12];
+      if ((x === 5 || x === 6) && y >= 2 && y <= 3) return [12, 14, 12];
+      const c = CAMO[Math.floor(E.hash2(x >> 1, y >> 1, 4242) * 4) % 4];
+      return c;
+    });
+    MOBTEX.bone = tex8((x, y) => nz(x, y, 8, [204, 200, 190], 12));
+    MOBTEX.ribs = tex8((x, y) => {
+      if (y === 2 || y === 4 || y === 6) return [130, 126, 118];
+      return nz(x, y, 8, [204, 200, 190], 12);
+    });
+    MOBTEX.skFace = tex8((x, y) => {
+      if ((x === 1 || x === 2) && y === 3) return [16, 16, 18];
+      if ((x === 5 || x === 6) && y === 3) return [16, 16, 18];
+      if (x >= 3 && x <= 4 && y === 4) return [110, 106, 98];
+      if (y === 6 && x >= 2 && x <= 5) return [120, 116, 108];
+      return nz(x, y, 8, [204, 200, 190], 12);
+    });
+    MOBTEX.bowTex = tex8((x, y) => nz(x, y, 9, [118, 84, 44], 12));
+  })();
+
   function makeMobMesh(type) {
-    const d = MOB_DEFS[type];
     const g = new THREE.Group();
     const parts = [];
-    function box(w, h, dp, color, x, y, z) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, dp), new THREE.MeshBasicMaterial({ color }));
+    function part(w, h, dp, texAll, texFace, x, y, z, rotX) {
+      let mat;
+      if (texFace) {
+        const mk = () => new THREE.MeshBasicMaterial({ map: texAll });
+        const face = new THREE.MeshBasicMaterial({ map: texFace });
+        // ordre BoxGeometry : +x, -x, +y, -y, +z (dos), -z (face visible de face)
+        mat = [mk(), mk(), mk(), mk(), mk(), face];
+      } else {
+        mat = new THREE.MeshBasicMaterial({ map: texAll });
+      }
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, dp), mat);
       m.position.set(x, y, z);
-      m.userData.base = color;
+      if (rotX) m.rotation.x = rotX;
+      m.userData.base = 0xffffff;
       g.add(m);
       parts.push(m);
       return m;
     }
-    if (type === 'creeper') {
-      box(0.55, 0.85, 0.3, d.body, 0, 0.95, 0);
-      box(0.5, 0.5, 0.5, d.head, 0, 1.45, 0);
-      box(0.22, 0.35, 0.22, d.leg, -0.15, 0.17, 0.22);
-      box(0.22, 0.35, 0.22, d.leg, 0.15, 0.17, 0.22);
-      box(0.22, 0.35, 0.22, d.leg, -0.15, 0.17, -0.22);
-      box(0.22, 0.35, 0.22, d.leg, 0.15, 0.17, -0.22);
-    } else if (type === 'skeleton') {
-      box(0.4, 0.75, 0.25, d.body, 0, 1.05, 0);
-      box(0.45, 0.45, 0.45, d.head, 0, 1.65, 0);
-      box(0.12, 0.7, 0.12, d.leg, -0.12, 0.35, 0);
-      box(0.12, 0.7, 0.12, d.leg, 0.12, 0.35, 0);
-      box(0.1, 0.6, 0.1, d.body, -0.3, 1.2, 0);
-      box(0.1, 0.6, 0.1, d.body, 0.3, 1.2, 0);
-      box(0.08, 0.08, 0.7, 0x8a6b45, 0.3, 1.15, -0.35);
+    const T = MOBTEX;
+    if (type === 'pig') {
+      part(0.625, 0.5, 1.0, T.pigSkin, null, 0, 0.62, 0.06);
+      part(0.5, 0.5, 0.5, T.pigSkin, T.pigFace, 0, 0.65, -0.66);
+      part(0.24, 0.36, 0.24, T.pigLeg, null, -0.19, 0.18, -0.33);
+      part(0.24, 0.36, 0.24, T.pigLeg, null, 0.19, 0.18, -0.33);
+      part(0.24, 0.36, 0.24, T.pigLeg, null, -0.19, 0.18, 0.41);
+      part(0.24, 0.36, 0.24, T.pigLeg, null, 0.19, 0.18, 0.41);
+    } else if (type === 'sheep') {
+      part(0.68, 0.66, 1.05, T.wool, null, 0, 0.98, 0);
+      part(0.42, 0.46, 0.5, T.sheepSkin, T.sheepFace, 0, 1.22, -0.7);
+      part(0.2, 0.5, 0.2, T.sheepSkin, null, -0.16, 0.25, -0.33);
+      part(0.2, 0.5, 0.2, T.sheepSkin, null, 0.16, 0.25, -0.33);
+      part(0.2, 0.5, 0.2, T.sheepSkin, null, -0.16, 0.25, 0.33);
+      part(0.2, 0.5, 0.2, T.sheepSkin, null, 0.16, 0.25, 0.33);
     } else if (type === 'zombie') {
-      box(0.5, 0.75, 0.3, d.body, 0, 1.05, 0);
-      box(0.5, 0.5, 0.5, d.head, 0, 1.65, 0);
-      box(0.2, 0.7, 0.2, d.leg, -0.13, 0.35, 0);
-      box(0.2, 0.7, 0.2, d.leg, 0.13, 0.35, 0);
-      box(0.2, 0.2, 0.7, d.body, -0.35, 1.2, -0.2);
-      box(0.2, 0.2, 0.7, d.body, 0.35, 1.2, -0.2);
-    } else {
-      const bh = type === 'sheep' ? 0.7 : 0.6;
-      box(0.7, bh, 1.1, d.body, 0, 0.75, 0);
-      box(0.45, 0.45, 0.45, d.head, 0, 0.95, -0.7);
-      box(0.18, 0.45, 0.18, d.leg, -0.22, 0.22, -0.35);
-      box(0.18, 0.45, 0.18, d.leg, 0.22, 0.22, -0.35);
-      box(0.18, 0.45, 0.18, d.leg, -0.22, 0.22, 0.35);
-      box(0.18, 0.45, 0.18, d.leg, 0.22, 0.22, 0.35);
+      part(0.5, 0.5, 0.5, T.zSkin, T.zFace, 0, 1.72, 0);
+      part(0.5, 0.75, 0.26, T.zShirt, null, 0, 1.1, 0);
+      part(0.22, 0.75, 0.22, T.zSkin, null, -0.36, 1.28, -0.3, -Math.PI / 2); // bras tendus
+      part(0.22, 0.75, 0.22, T.zSkin, null, 0.36, 1.28, -0.3, -Math.PI / 2);
+      part(0.24, 0.74, 0.24, T.zPants, null, -0.13, 0.37, 0);
+      part(0.24, 0.74, 0.24, T.zPants, null, 0.13, 0.37, 0);
+    } else if (type === 'creeper') {
+      part(0.5, 0.5, 0.5, T.creeperSkin, T.creeperFace, 0, 1.44, 0);
+      part(0.46, 0.86, 0.3, T.creeperSkin, null, 0, 0.86, 0);
+      part(0.24, 0.34, 0.24, T.creeperSkin, null, -0.14, 0.17, -0.22);
+      part(0.24, 0.34, 0.24, T.creeperSkin, null, 0.14, 0.17, -0.22);
+      part(0.24, 0.34, 0.24, T.creeperSkin, null, -0.14, 0.17, 0.22);
+      part(0.24, 0.34, 0.24, T.creeperSkin, null, 0.14, 0.17, 0.22);
+    } else { // squelette
+      part(0.5, 0.5, 0.5, T.bone, T.skFace, 0, 1.72, 0);
+      part(0.4, 0.75, 0.16, T.ribs, null, 0, 1.1, 0);
+      part(0.12, 0.72, 0.12, T.bone, null, -0.3, 1.3, -0.32, -Math.PI / 2);
+      part(0.12, 0.72, 0.12, T.bone, null, 0.3, 1.3, -0.32, -Math.PI / 2);
+      part(0.12, 0.74, 0.12, T.bone, null, -0.11, 0.37, 0);
+      part(0.12, 0.74, 0.12, T.bone, null, 0.11, 0.37, 0);
+      part(0.08, 0.5, 0.08, T.bowTex, null, 0.3, 1.3, -0.6); // petit arc
     }
     g.userData.parts = parts;
     return g;
@@ -1611,7 +1892,11 @@
     m.mesh.rotation.y = m.yaw;
     const flash = m.hurtT > 0;
     for (const p of m.mesh.userData.parts) {
-      p.material.color.setHex(flash ? 0xff5555 : p.userData.base);
+      if (Array.isArray(p.material)) {
+        for (const mm of p.material) mm.color.setHex(flash ? 0xff5555 : 0xffffff);
+      } else {
+        p.material.color.setHex(flash ? 0xff5555 : p.userData.base);
+      }
     }
   }
 
@@ -1625,12 +1910,13 @@
     arrows.push({
       pos: new THREE.Vector3(shooter.pos.x, shooter.pos.y + 1.5, shooter.pos.z),
       v: new THREE.Vector3(dx / d * 16, dy / d * 16 + 1.6, dz / d * 16),
-      life: 5, mesh
+      life: 5, mesh, from: 'mob', dmg: 3
     });
   }
   function updateArrows(dt) {
     for (let i = arrows.length - 1; i >= 0; i--) {
       const a = arrows[i];
+      const ax0 = a.pos.x, ay0 = a.pos.y, az0 = a.pos.z;
       a.life -= dt;
       a.v.y -= 14 * dt;
       a.pos.x += a.v.x * dt; a.pos.y += a.v.y * dt; a.pos.z += a.v.z * dt;
@@ -1644,11 +1930,58 @@
         if (hitBlock) playSound(90, 0.06, 0.08);
         continue;
       }
-      if (d2p < 0.9 && !player.dead) {
-        damagePlayer(3, a.v.x, a.v.z);
+      if (a.from !== 'player' && d2p < 0.9 && !player.dead) {
+        damagePlayer(a.dmg || 3, a.v.x, a.v.z);
         scene.remove(a.mesh); arrows.splice(i, 1);
+        continue;
+      }
+      if (hitBlock && a.from === 'player' && Math.random() < 0.4) addItem(112, 1); // flèche parfois récupérée
+      if (a.from === 'player') {
+        // balayage le long du déplacement de la frame (évite de traverser les mobs à grande vitesse)
+        let hitM = null;
+        for (const m of mobs) {
+          for (let ss = 0; ss <= 4 && !hitM; ss++) {
+            const sx = ax0 + (a.pos.x - ax0) * ss / 4;
+            const sy = ay0 + (a.pos.y - ay0) * ss / 4;
+            const sz = az0 + (a.pos.z - az0) * ss / 4;
+            const dm = Math.hypot(m.pos.x - sx, (m.pos.y + m.hh * 0.5) - sy, m.pos.z - sz);
+            if (dm < m.hw + 0.35) hitM = m;
+          }
+          if (hitM) break;
+        }
+        if (hitM) {
+          hitM.hp -= a.dmg || 3;
+          hitM.hurtT = 0.25;
+          const kx = hitM.pos.x - a.pos.x, kz = hitM.pos.z - a.pos.z, kd = Math.hypot(kx, kz) || 1;
+          hitM.vel.x += kx / kd * 5; hitM.vel.z += kz / kd * 5; hitM.vel.y = 3;
+          playSound(200, 0.12, 0.12);
+          scene.remove(a.mesh); a.mesh.geometry.dispose(); a.mesh.material.dispose(); arrows.splice(i, 1);
+          if (hitM.hp <= 0) killMob(hitM, true);
+          continue;
+        }
       }
     }
+  }
+  function releaseBow() {
+    const power = Math.min(1, bowT / 1.1);
+    bowCharging = false;
+    bowT = 0;
+    if (power < 0.12) return;
+    if (gameMode === 'survival' && countItem(112) <= 0) { showToast('Plus de flèches !'); return; }
+    if (gameMode === 'survival') takeItem(112, 1);
+    spawnPlayerArrow(power);
+    swingT = 1;
+  }
+  function spawnPlayerArrow(power) {
+    const dir = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.5), new THREE.MeshBasicMaterial({ color: 0x8a6b45 }));
+    scene.add(mesh);
+    arrows.push({
+      pos: new THREE.Vector3(camera.position.x, camera.position.y, camera.position.z),
+      v: dir.multiplyScalar(26 * power),
+      life: 6, mesh, from: 'player', dmg: Math.round(1 + 8 * power)
+    });
+    playSound(480, 0.16, 0.11, 'square');
   }
   function explodeAt(x, y, z) {
     const R = 2.8;
@@ -1661,6 +1994,7 @@
           const id = getBlock(bx, by, bz);
           if (id === AIR || id === BEDROCK || E.isWater(id)) continue;
           if (id === CHEST) spillChest(bx, by, bz);
+          if (id === FURNACE) spillFurnace(bx, by, bz);
           applyBlock(bx, by, bz, AIR, true);
           broken.push([bx, by, bz, id]);
         }
@@ -1859,8 +2193,32 @@
     ctx.drawImage(atlasCanvas, (t % 8) * 16, ((t / 8) | 0) * 16, 16, 16, 0, 0, 32, 32);
   }
 
+  function nameFor(id) {
+    if (id >= 100) return ITEMS[id] ? ITEMS[id].name : '';
+    return E.BLOCKS[id] ? E.BLOCKS[id].name : '';
+  }
+  function countItem(id) {
+    let n = 0;
+    for (let i = 0; i < 36; i++) if (inv[i] && inv[i].id === id) n += inv[i].count;
+    return n;
+  }
+  function takeItem(id, nn) {
+    for (let i = 0; i < 36 && nn > 0; i++) {
+      const st = inv[i];
+      if (st && st.id === id) {
+        const t = Math.min(nn, st.count);
+        st.count -= t; nn -= t;
+        if (st.count <= 0) inv[i] = null;
+      }
+    }
+    updateHotbarUI();
+  }
   function renderSlotContent(el, stack) {
     el.innerHTML = '';
+    if (el.setAttribute) {
+      if (stack && nameFor(stack.id)) el.setAttribute('data-tip', nameFor(stack.id));
+      else el.setAttribute('data-tip', '');
+    }
     if (!stack) return;
     const cv = document.createElement('canvas');
     cv.width = 32;
@@ -1923,6 +2281,14 @@
 
   function renderInventory() {
     for (let i = 0; i < 27; i++) { if (openChestArr && chestSlotEls[i]) renderSlotContent(chestSlotEls[i], openChestArr[i]); }
+    if (openFurnaceKey) {
+      const ff = furnaceData.get(openFurnaceKey);
+      if (ff && furnSlotEls.inp) {
+        renderSlotContent(furnSlotEls.inp, ff.inpA[0]);
+        renderSlotContent(furnSlotEls.fuel, ff.fuelA[0]);
+        renderSlotContent(furnSlotEls.out, ff.outA[0]);
+      }
+    }
     for (let i = 9; i < 36; i++) renderSlotContent(invMainSlotEls[i], inv[i]);
     for (let i = 0; i < 9; i++) renderSlotContent(invHotbarSlotEls[i], inv[i]);
     for (const cs of craftSlotEls) renderSlotContent(cs.el, craftCells[cs.i]);
@@ -1969,6 +2335,9 @@
     }
     craftResult = null;
     openChestArr = null;
+    openFurnaceKey = null;
+    furnSlotEls.inp = furnSlotEls.fuel = furnSlotEls.out = null;
+    if (furnaceRowEl) { furnaceRowEl.classList.add('hidden'); furnaceRowEl.innerHTML = ''; }
     craftGridEl.classList.remove('hidden');
     resultSlotEl.classList.remove('hidden');
     invEl.classList.add('hidden');
@@ -2031,7 +2400,7 @@
     [GLASS]: 0.5, [TORCH]: 0.1,
     [FLOWER_RED]: 0.05, [FLOWER_YELLOW]: 0.05, [TALLGRASS]: 0.05, [BED]: 0.2, [CHEST]: 1.6,
     [STONE]: 2.4, [COBBLE]: 2.4, [BRICK]: 2.4,
-    [COAL_ORE]: 2.8, [IRON_ORE]: 3.2
+    [COAL_ORE]: 2.8, [IRON_ORE]: 3.2, [FURNACE]: 3.5
   };
   function hardnessFor(id) { return HARDNESS[id] || 1.5; }
 
@@ -2056,10 +2425,11 @@
     return it && it.pick ? it.pick : null;
   }
   function isStoneLike(id) {
-    return id === STONE || id === COBBLE || id === BRICK || id === COAL_ORE || id === IRON_ORE;
+    return id === STONE || id === COBBLE || id === BRICK || id === COAL_ORE || id === IRON_ORE || id === FURNACE;
   }
   function breakBlockAt(x, y, z, id, canDrop) {
     if (id === CHEST) spillChest(x, y, z);
+    if (id === FURNACE) spillFurnace(x, y, z);
     applyBlock(x, y, z, AIR, true);
     spawnBlockParticles(x, y, z, id);
     const bs = blockSound(id);
@@ -2178,7 +2548,7 @@
     if (id === TALLGRASS) return null;
     if (isStoneLike(id)) {
       if (!tool) return null;
-      if (id === IRON_ORE && tool < 3) return null;
+      if (id === IRON_ORE && tool < 2.6) return null; // une pioche en bois suffit (comme MC)
       if (id === STONE) return COBBLE;
       if (id === COAL_ORE) return 100;
       if (id === IRON_ORE) return 105;
@@ -2224,12 +2594,14 @@
     if (gameMode === 'creative') {
       [GRASS, DIRT, STONE, SAND, LOG, LEAVES, PLANKS, COBBLE, GLASS, BRICK,
        SNOW, GRAVEL, WOOL, COAL_ORE, IRON_ORE, TABLE, TORCH,
-       FLOWER_RED, FLOWER_YELLOW, TALLGRASS, BED, CHEST].forEach((id, i) => {
+       FLOWER_RED, FLOWER_YELLOW, TALLGRASS, BED, CHEST, FURNACE].forEach((id, i) => {
         inv[i] = { id, count: 64 };
       });
       inv[22] = { id: 107, count: 1 };
       inv[23] = { id: 108, count: 1 };
       inv[24] = { id: 109, count: 1 };
+      inv[25] = { id: 113, count: 1 };
+      inv[26] = { id: 112, count: 64 };
     }
     xp = 0; xpLevel = 0;
     updateHealthUI();
@@ -2248,6 +2620,8 @@
   function resetWorld() {
     villages.length = 0;
     chestData.clear();
+    furnaceData.clear();
+    openFurnaceKey = null;
     for (const ch of chunks.values()) unloadChunk(ch);
     chunks.clear();
     meshQueue = [];
@@ -2456,6 +2830,15 @@
       if (!held) return;
       if (held.id >= 100) {
         const it = ITEMS[held.id];
+        if (it.bow) {
+          if (gameMode === 'creative' || countItem(112) > 0) {
+            bowCharging = true;
+            bowT = 0;
+          } else {
+            showToast('Il faut des flèches !');
+          }
+          return;
+        }
         if (it.armor) {
           armorWorn = !armorWorn;
           updateArmorUI();
@@ -2515,7 +2898,24 @@
 
   document.addEventListener('mouseup', (e) => {
     if (e.button === 0) { mouseLeftDown = false; mining = null; }
+    if (e.button === 2 && bowCharging) releaseBow();
   });
+
+  document.addEventListener('mousemove', (e) => {
+    const tipEl = document.getElementById('item-tip');
+    const tgt = e.target;
+    const tip = tgt && tgt.getAttribute ? tgt.getAttribute('data-tip') : null;
+    if (tipsAreHidden(tipEl) || !tip) { if (tipEl && !tipsAreHidden(tipEl)) tipEl.classList.add('hidden'); return; }
+    tipEl.textContent = tip;
+    tipEl.classList.remove('hidden');
+    tipEl.style.left = Math.min(window.innerWidth - 140, e.clientX + 14) + 'px';
+    tipEl.style.top = (e.clientY + 14) + 'px';
+  });
+  function tipsAreHidden(tipEl) {
+    if (!tipEl) return true;
+    if (tipEl.classList.contains('hidden')) return true;
+    return false;
+  }
 
   try {
     const savedSeed = localStorage.getItem('webcraft_seed');
@@ -2597,9 +2997,12 @@
       }
       fallTimer += dt;
       if (fallTimer >= 0.15) { fallTimer = 0; tickFalls(); }
+      if (bowCharging && gameMode === 'survival' && countItem(112) <= 0) { bowCharging = false; bowT = 0; }
+      if (bowCharging) bowT += dt;
+      tickFurnaces(dt);
       for (let i = mobs.length - 1; i >= 0; i--) {
         const m = mobs[i];
-        const d = Math.hypot(m.pos.x - player.pos.x, m.pos.z - m.pos.z);
+        const d = Math.hypot(m.pos.x - player.pos.x, m.pos.z - player.pos.z);
         if (d > renderDist * 16 + 24) { killMob(m, false); continue; }
         updateMob(m, dt);
       }
@@ -2644,7 +3047,16 @@
     toggleArmor(v) { armorWorn = v === undefined ? !armorWorn : !!v; updateArmorUI(); },
     setDay(t) { dayTime = t; updateSky(); },
     openChestAt,
+    openFurnaceAt,
     chestData,
+    furnaceData,
+    getFurnace: furnaceAt,
+    tickFurnaces,
+    nameFor,
+    countItem,
+    takeItem,
+    SMELT,
+    spawnPlayerArrow,
     villages,
     get openChestArr() { return openChestArr; },
     get armorWorn() { return armorWorn; },
