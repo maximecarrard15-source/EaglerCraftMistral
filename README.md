@@ -95,7 +95,7 @@ Lancer en local : double-cliquez `index.html` ou `npx serve .`
 
 **Inventaire & craft**
 - Inventaire 36 slots (touche **E**), barre rapide 9 slots (molette ou touches 1-9).
-- **Icônes d'objets refaites** (16×16 peintes) : épées en diagonale avec garde et
+- **Icônes d'objets refaites** (motifs peints, rendu haute résolution 64×64) : épées en diagonale avec garde et
   poignée, pioches en arche, lingot trapézoïdal, porc/mouton avec os, charbon
   facetté, bâton en diagonale, flèche et arc détaillés…
 - **Infobulle** : survolez un objet (inventaire, coffre, four) → son nom s'affiche
@@ -174,11 +174,11 @@ Façon Minecraft 1.14 : le monde reste visible derrière un voile sombre.
 
 ## Textures
 
-L'atlas de textures (16×16) et toutes les icônes d'objets sont **redessinés à la
+L'atlas de textures (**64×64 par tuile**) et toutes les icônes d'objets sont **redessinés à la
 main dans le style de Minecraft** (herbe bordée, bûches cerclées, briques en
 quinconce, minerais mouchetés, fleurs, lit, coffre, four à bouche incandescente,
 épées/pioches, viandes, arc, flèches…), de même que les skins des mobs (peints
-en 8×8 : camo du creeper, côtes du squelette, groin, laine tissée…). Les textures
+en **32×32 rendu** (motif sur grille 8 + grain fin par pixel) : camo du creeper, côtes du squelette, groin, laine tissée…). Les textures
 et sons officiels de Mojang ne peuvent pas être copiés (droits d'auteur) : tout
 a été recréé de zéro pixel par pixel en reprenant les codes visuels emblématiques
 (taille des tuiles, motifs, palettes).
@@ -196,3 +196,7 @@ vaches/poules, seau/lait/œufs lançables, sprint sur R, multijoueur complet
 (poignée de main hôte/invité, **lobby avec code affiché avant lancement**, graine imposée, blocs partagés),
 minimap (couleurs + mise à jour), enderman (spawn, aggro par le regard,
 aggro en mélée/fleche → téléportation)**.
+
+- **v9c** : atlas de textures passé en **64×64 par tuile** et skins des mobs en **32×32** :
+  chaque motif reste peint à la main, agrandi proprement ×4 avec un grain fin par pixel
+  (look « faithfully »), sans copier aucune ressource Mojang.

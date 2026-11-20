@@ -339,7 +339,7 @@
   }
 
   function buildAtlas() {
-    const T = 16, COLS = 8, SIZE = T * COLS;
+    const T = 64, COLS = 8, SIZE = T * COLS, S = 4; // tuiles 64×64 : motif en grille 16 + grain fin par pixel
     const cv = document.createElement('canvas');
     cv.width = SIZE; cv.height = SIZE;
     const ctx = cv.getContext('2d');
@@ -352,11 +352,15 @@
       const img = ctx.createImageData(T, T);
       for (let y = 0; y < T; y++) {
         for (let x = 0; x < T; x++) {
-          const r = rnd(x, y, idx);
-          const c = fn(x, y, r);
+          // motif : peint sur la grille 16 (sx, sy) puis agrandi ×4 proprement
+          const sx = (x / S) | 0, sy = (y / S) | 0;
+          const r = rnd(sx, sy, idx);
+          const c = fn(sx, sy, r);
+          // grain fin à la vraie résolution 64×64 (style faithfully)
+          const gf = (rnd(x, y, 901 + idx) - 0.5) * 14;
           const o = (y * T + x) * 4;
-          img.data[o] = cl(c[0]); img.data[o + 1] = cl(c[1]);
-          img.data[o + 2] = cl(c[2]);
+          img.data[o] = cl(c[0] + gf); img.data[o + 1] = cl(c[1] + gf);
+          img.data[o + 2] = cl(c[2] + gf);
           img.data[o + 3] = c.length > 3 ? c[3] : 255;
         }
       }
@@ -1877,17 +1881,19 @@
   const MOBTEX = {};
   (function () {
     function tex8(paint) {
+      const R2 = 32; // rendu 32×32 : motif sur grille 8, agrandi ×4 avec grain fin
       const cv = document.createElement('canvas');
-      cv.width = 8; cv.height = 8;
+      cv.width = R2; cv.height = R2;
       const c = cv.getContext('2d');
-      const img = c.createImageData(8, 8);
-      for (let y = 0; y < 8; y++) {
-        for (let x = 0; x < 8; x++) {
-          const px = paint(x, y);
-          const o = (y * 8 + x) * 4;
-          img.data[o] = Math.max(0, Math.min(255, px[0]));
-          img.data[o + 1] = Math.max(0, Math.min(255, px[1]));
-          img.data[o + 2] = Math.max(0, Math.min(255, px[2]));
+      const img = c.createImageData(R2, R2);
+      for (let y = 0; y < R2; y++) {
+        for (let x = 0; x < R2; x++) {
+          const px = paint((x / 4) | 0, (y / 4) | 0);
+          const gr = (E.hash2(x * 3 + 51, y * 7, 901) - 0.5) * 10;
+          const o = (y * R2 + x) * 4;
+          img.data[o] = Math.max(0, Math.min(255, px[0] + gr));
+          img.data[o + 1] = Math.max(0, Math.min(255, px[1] + gr));
+          img.data[o + 2] = Math.max(0, Math.min(255, px[2] + gr));
           img.data[o + 3] = 255;
         }
       }
@@ -2580,7 +2586,7 @@
     const t = itemTile(id);
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, 32, 32);
-    ctx.drawImage(atlasCanvas, (t % 8) * 16, ((t / 8) | 0) * 16, 16, 16, 0, 0, 32, 32);
+    ctx.drawImage(atlasCanvas, (t % 8) * 64, ((t / 8) | 0) * 64, 64, 64, 0, 0, 32, 32);
   }
 
   function nameFor(id) {
@@ -2852,10 +2858,10 @@
     }
   }
   function tileAvgColor(tile) {
-    const d = atlasCtx.getImageData((tile % 8) * 16 + 8, ((tile / 8) | 0) * 16 + 8, 3, 3).data;
+    const d = atlasCtx.getImageData((tile % 8) * 64 + 24, ((tile / 8) | 0) * 64 + 24, 16, 16).data;
     let r = 0, g = 0, b = 0;
-    for (let i = 0; i < 9; i++) { r += d[i * 4]; g += d[i * 4 + 1]; b += d[i * 4 + 2]; }
-    return (Math.round(r / 9) << 16) | (Math.round(g / 9) << 8) | Math.round(b / 9);
+    for (let i = 0; i < 256; i++) { r += d[i * 4]; g += d[i * 4 + 1]; b += d[i * 4 + 2]; }
+    return (Math.round(r / 256) << 16) | (Math.round(g / 256) << 8) | Math.round(b / 256);
   }
   function updateParticles(dt) {
     for (let i = particles.length - 1; i >= 0; i--) {
@@ -3114,7 +3120,8 @@
     cv.width = 16;
     cv.height = 16;
     const c = cv.getContext('2d');
-    c.drawImage(atlasCanvas, 32, 0, 16, 16, 0, 0, 16, 16);
+    c.imageSmoothingEnabled = false;
+    c.drawImage(atlasCanvas, 128, 0, 64, 64, 0, 0, 16, 16);
     c.fillStyle = 'rgba(0,0,0,0.62)';
     c.fillRect(0, 0, 16, 16);
     const url = 'url(' + cv.toDataURL() + ')';
