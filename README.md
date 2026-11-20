@@ -148,15 +148,18 @@ Façon Minecraft 1.14 : le monde reste visible derrière un voile sombre.
 
 ## Multijoueur
 
-- Menu principal → **Créer un salon** : un code à 5 caractères est généré,
-  partage-le avec tes amis.
-- Ou **Rejoindre** avec le code. Les mondes sont synchronisés par le broker
+- Menu principal → **Créer un salon** : un code à 5 caractères est généré
+  et s'affiche **en grand dans un lobby**, avec un bouton **Copier le code**.
+  **Tu ne rentres dans le monde que quand tu cliques sur « Lancer la partie »** —
+  tu as tout ton temps pour partager le code.
+- **Rejoindre** avec le code (les invités peuvent même rejoindre le salon
+  avant que l'hôte ait lancé la partie). Les mondes sont synchronisés par le broker
   public MQTT (broker.emqx.io, chiffré wss) : blocs, positions, avatars colorés — mode et heure du jour partagés.
 - Le multijoueur est **entièrement facultatif** : le bouton « Jouer en solo »
   n'y touche jamais — si le serveur est injoignable, le solo fonctionne
   toujours normalement.
 - Le salon ferme la connexion quand l'hôte quitte (pas de serveur à payer).
-- **Corrigé (v9)** : l'invité ne pouvait jamais rejoindre — le rôle hôte/invité
+- **Corrigé (v9b)** : l'invité ne pouvait jamais rejoindre — le rôle hôte/invité
   n'était pas enregistré (les « hello » étaient ignorés) et l'invité générait
   sa propre graine au lieu de celle de l'hôte. Le protocole complet est
   vérifié par des tests (hello → welcome → graine imposée → blocs partagés → bye).
@@ -183,13 +186,13 @@ a été recréé de zéro pixel par pixel en reprenant les codes visuels emblém
 ## Vérification
 
 Suite de tests sans navigateur : `node /tmp/smoke.js` (harnais VM Node) —
-98 contrôles : moteur, grottes, biomes, craft, minage/délais, drops, faim/regen,
+101 contrôles : moteur, grottes, biomes, craft, minage/délais, drops, faim/regen,
 explosions, squelettes/flèches, XP, sable, jour/nuit, mobs, particules,
 sortie d'eau, lit/dormir, armure, coffres persistants, villages,
 four (fabrication, fusion, jauges), infobulle des noms, arc (tir, dégâts,
 kill avec butin et XP), flèches des squelettes,
 **portes (craft, pose en paire, ouverture/collision), pancartes (texte),
 vaches/poules, seau/lait/œufs lançables, sprint sur R, multijoueur complet
-(poignée de main hôte/invité, graine imposée, blocs partagés),
+(poignée de main hôte/invité, **lobby avec code affiché avant lancement**, graine imposée, blocs partagés),
 minimap (couleurs + mise à jour), enderman (spawn, aggro par le regard,
 aggro en mélée/fleche → téléportation)**.

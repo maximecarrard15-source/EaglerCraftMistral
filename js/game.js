@@ -2987,10 +2987,14 @@
            z + 1 > p.z - hw && z < p.z + hw;
   }
 
-  function startGame() {
+  function resolveSeed() {
     const raw = seedInput.value.trim();
     let seed = parseInt(raw, 10);
     if (!Number.isFinite(seed) || String(seed) !== raw) seed = hashString(raw || String(Date.now()));
+    return seed;
+  }
+  function startGame() {
+    let seed = resolveSeed();
     if (netState.active && netState.role === 'guest' && netState.seedOverride !== null) {
       seed = netState.seedOverride; // le monde doit matcher celui de l'hôte
     }
@@ -3093,6 +3097,7 @@
 
   function quitToMenu() {
     saveEdits();
+    hideHostLobby();
     if (netState.active) netPublish({ t: 'bye', from: netState.id });
     gameState = 'menu';
     pauseEl.classList.add('hidden');
@@ -3669,6 +3674,7 @@
     el.classList.remove('hidden');
   }
   function netEnd() {
+    hideHostLobby();
     if (netState.client) { try { netState.client.end(true); } catch (err) {} }
     netState.client = null;
     netState.room = null;
@@ -3702,7 +3708,7 @@
     try { msg = JSON.parse(payload.toString ? payload.toString() : String(payload)); } catch (err) { return; }
     if (!msg || msg.from === netState.id) return;
     if (msg.t === 'hello') {
-      if (currentNetRole() !== 'host' || gameState !== 'playing') return;
+      if (currentNetRole() !== 'host') return; // répond aussi en lobby
       upsertPlayer(msg.from, msg.name, player.pos.x, player.pos.y, player.pos.z, 0, 0);
       const ed = {};
       for (const [k, m] of editsByChunk) ed[k] = m;
@@ -3763,6 +3769,7 @@
     } else {
       netState.room = makeRoomCode();
       if (codeInput) codeInput.value = netState.room;
+      E.setSeed(resolveSeed()); // graine fixée tout de suite (le welcome peut partir avant le lancement)
     }
     netStatus('Connexion au serveur…');
     netState.active = true;
@@ -3779,8 +3786,8 @@
     netState.client.on('connect', () => {
       netState.client.subscribe('webcraft/v1/' + netState.room);
       if (role === 'host') {
-        netStatus('Salon créé : ' + netState.room + ' — partage le code !');
-        startGame();
+        netStatus('Salon prêt : ' + netState.room + ' — copie le code puis lance la partie');
+        showHostLobby();
       } else {
         netPublish({ t: 'hello', from: netState.id, name: playerName() });
         netStatus('Recherche de la partie ' + netState.room + '…');
@@ -3797,6 +3804,46 @@
     netState.client.on('error', () => { if (gameState === 'menu') netStatus('Erreur de connexion au serveur', true); });
     netState.client.on('close', () => { if (gameState === 'menu' && netState.joining) { netState.joining = false; netStatus('Déconnecté', true); } });
   }
+  function showHostLobby() {
+    netState.inLobby = true;
+    const codeEl = document.getElementById('host-code');
+    const lobEl = document.getElementById('host-lobby');
+    if (codeEl) codeEl.textContent = netState.room || '';
+    if (lobEl) lobEl.classList.remove('hidden');
+  }
+  function hideHostLobby() {
+    netState.inLobby = false;
+    const lobEl = document.getElementById('host-lobby');
+    if (lobEl) lobEl.classList.add('hidden');
+  }
+  (function wireHostLobby() {
+    const btnLaunch = document.getElementById('btn-launch');
+    const btnCopy = document.getElementById('btn-copy-code');
+    if (btnLaunch) btnLaunch.addEventListener('click', () => {
+      if (netState.role !== 'host' || !netState.active) return;
+      hideHostLobby();
+      startGame();
+      netStatus('Partie lancée — bonne partie !');
+    });
+    if (btnCopy) btnCopy.addEventListener('click', () => {
+      const code = netState.room || '';
+      let ok = false;
+      try {
+        if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(code);
+          ok = true;
+        }
+      } catch (err) {}
+      if (!ok) {
+        try {
+          const inp = document.getElementById('room-code');
+          if (inp && inp.select) { inp.select(); ok = true; }
+        } catch (err2) {}
+      }
+      netStatus(ok ? 'Code copié : ' + code : 'Code : ' + code, !ok);
+    });
+  })();
+
   function netTick(dt) {
     if (!netState.active || !netState.client || gameState !== 'playing') return;
     if (netState.slowTimer === undefined) netState.slowTimer = 0;
