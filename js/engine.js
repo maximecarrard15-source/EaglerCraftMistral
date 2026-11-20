@@ -11,7 +11,9 @@
         TABLE = 18, TORCH = 19,
         FLOWER_RED = 20, FLOWER_YELLOW = 21, TALLGRASS = 22,
         BED = 23, CHEST = 24, FURNACE = 25,
-        DOOR_L = 26, DOOR_U = 27, SIGN = 28;
+        DOOR_L = 26, DOOR_U = 27, SIGN = 28,
+        FARMLAND = 29, WHEAT1 = 30, WHEAT2 = 31, WHEAT3 = 32,
+        BIRCH_LOG = 33, SANDSTONE = 34, LADDER = 35;
 
   const BLOCKS = {
     [GRASS]:    { name: 'Herbe',            top: 0,  bottom: 2,  side: 1,  opaque: true,  solid: true },
@@ -41,7 +43,14 @@
     [CHEST]:         { name: 'Coffre',        top: 37, bottom: 36, side: 36, opaque: true,  solid: true, chest: true },
     [DOOR_L]:   { name: 'Porte',         top: 46, bottom: 46, side: 46, opaque: false, solid: true,  door: true, lower: true },
     [DOOR_U]:   { name: 'Porte',         top: 47, bottom: 47, side: 47, opaque: false, solid: true,  door: true, upper: true },
-    [SIGN]:     { name: 'Pancarte',      top: 48, bottom: 48, side: 48, opaque: false, solid: false, sign: true }
+    [SIGN]:     { name: 'Pancarte',      top: 48, bottom: 48, side: 48, opaque: false, solid: false, sign: true },
+    [FARMLAND]: { name: 'Terre labourée',  top: 49, bottom: 2,  side: 49, opaque: true,  solid: true,  farmland: true },
+    [WHEAT1]:   { name: 'Blé (pousse)',    top: 50, bottom: 50, side: 50, opaque: false, solid: false, plant: true, wheat: 1 },
+    [WHEAT2]:   { name: 'Blé (en herbe)',  top: 51, bottom: 51, side: 51, opaque: false, solid: false, plant: true, wheat: 2 },
+    [WHEAT3]:   { name: 'Blé (mûr)',       top: 52, bottom: 52, side: 52, opaque: false, solid: false, plant: true, wheat: 3 },
+    [BIRCH_LOG]:{ name: 'Bûche de bouleau',top: 60, bottom: 60, side: 59, opaque: true,  solid: true },
+    [SANDSTONE]:{ name: 'Grès',            top: 58, bottom: 58, side: 58, opaque: true,  solid: true, stonelike: true },
+    [LADDER]:   { name: 'Échelle',         top: 61, bottom: 61, side: 61, opaque: false, solid: false, ladder: true }
   };
 
   for (let l = 8; l >= 1; l--) {
@@ -122,6 +131,9 @@
     if (m < 0.36) return 'desert';
     if (m > 0.64) return 'snow';
     if (m > 0.55) return 'forest';
+    const j = fbm(wx * 0.0046, wz * 0.0046, (SEED ^ 0x300A) | 0, 2);
+    if (j > 0.63) return 'jungle';
+    if (j < 0.37) return 'savanna';
     return 'plains';
   }
 
@@ -148,6 +160,12 @@
     return GRASS;
   }
 
+  function subSurfaceBlock(wx, wz, h, y) {
+    const biome = biomeAt(wx, wz);
+    if (biome === 'desert') return (y >= h - 2) ? SAND : SANDSTONE;
+    return DIRT;
+  }
+
   function oreAt(wx, y, wz) {
     if (y < 44 && hash3(wx, y, wz, (SEED ^ 0x7777) | 0) < 0.012) return COAL_ORE;
     if (y < 26 && hash3(wx, y, wz, (SEED ^ 0xaaaa) | 0) < 0.007) return IRON_ORE;
@@ -159,7 +177,11 @@
     if (h <= WATER_LEVEL + 1 || h >= 44) return false;
     const biome = biomeAt(wx, wz);
     if (biome === 'desert') return false;
-    const chance = biome === 'forest' ? 0.05 : (biome === 'snow' ? 0.004 : 0.012);
+    let chance = 0.012;
+    if (biome === 'forest') chance = 0.05;
+    else if (biome === 'jungle') chance = 0.05;
+    else if (biome === 'savanna') chance = 0.007;
+    else if (biome === 'snow') chance = 0.004;
     return hash2(wx, wz, (SEED ^ 0x51ab) | 0) < chance;
   }
 
@@ -227,6 +249,7 @@
     AIR, GRASS, DIRT, STONE, SAND, LOG, LEAVES, WATER, PLANKS, COBBLE,
     GLASS, BRICK, BEDROCK, SNOW, GRAVEL, WOOL, COAL_ORE, IRON_ORE, TABLE, TORCH,
     FLOWER_RED, FLOWER_YELLOW, TALLGRASS, BED, CHEST, FURNACE, DOOR_L, DOOR_U, SIGN,
+    FARMLAND, WHEAT1, WHEAT2, WHEAT3, BIRCH_LOG, SANDSTONE, LADDER, subSurfaceBlock,
     BLOCKS, FACES,
     setSeed, getSeed, hash2, hash3, noise2, fbm,
     terrainHeight, surfaceBlock, oreAt, treeAt, blockIndex, faceVisible, raycast,

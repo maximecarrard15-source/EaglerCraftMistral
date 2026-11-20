@@ -11,7 +11,9 @@
         TABLE = E.TABLE, TORCH = E.TORCH,
         FLOWER_RED = E.FLOWER_RED, FLOWER_YELLOW = E.FLOWER_YELLOW, TALLGRASS = E.TALLGRASS,
         BED = E.BED, CHEST = E.CHEST, FURNACE = E.FURNACE,
-        DOOR_L = E.DOOR_L, DOOR_U = E.DOOR_U, SIGN = E.SIGN;
+        DOOR_L = E.DOOR_L, DOOR_U = E.DOOR_U, SIGN = E.SIGN,
+        FARMLAND = E.FARMLAND, WHEAT1 = E.WHEAT1, WHEAT2 = E.WHEAT2, WHEAT3 = E.WHEAT3,
+        BIRCH_LOG = E.BIRCH_LOG, SANDSTONE = E.SANDSTONE, LADDER = E.LADDER;
 
   const ITEMS = {
     100: { name: 'Charbon', tile: 22, fuel: 8 },
@@ -32,7 +34,15 @@
     115: { name: 'Steak', tile: 54, food: 8 },
     116: { name: 'Seau', tile: 55, maxStack: 1 },
     117: { name: 'Seau de lait', tile: 56, milk: true, maxStack: 1 },
-    118: { name: 'Œuf', tile: 57, egg: true, maxStack: 16 }
+    118: { name: '\u0152uf', tile: 57, egg: true, maxStack: 16 },
+    119: { name: 'Graines de bl\u00e9', tile: 62, seeds: true },
+    120: { name: 'Bl\u00e9', tile: 63 },
+    121: { name: 'Pain', tile: 64, food: 5 },
+    122: { name: 'Houe en bois', tile: 65, hoe: true, maxStack: 1 },
+    123: { name: 'Houe en pierre', tile: 66, hoe: true, maxStack: 1 },
+    124: { name: 'Boule de slime', tile: 67 },
+    125: { name: 'Fil', tile: 68 },
+    126: { name: "Seau d'eau", tile: 69, maxStack: 1 }
   };
 
   function trimShape(shape) {
@@ -49,7 +59,6 @@
     { shape: [[PLANKS], [PLANKS]], out: { id: 101, count: 4 } },
     { shape: [[PLANKS, PLANKS], [PLANKS, PLANKS]], out: { id: TABLE, count: 1 } },
     { shape: [[100], [101]], out: { id: TORCH, count: 4 } },
-    { shape: [[SAND, SAND], [SAND, SAND]], out: { id: GLASS, count: 4 } },
     { shape: [[COBBLE, COBBLE], [COBBLE, COBBLE]], out: { id: BRICK, count: 4 } },
     { shape: [[LEAVES, LEAVES], [LEAVES, LEAVES]], out: { id: 101, count: 2 } },
     { shape: [[PLANKS], [101]], out: { id: 102, count: 1 } },
@@ -63,7 +72,14 @@
     { shape: [[GRAVEL], [101], [WOOL]], out: { id: 112, count: 4 } },
     { shape: [[PLANKS, PLANKS], [PLANKS, PLANKS], [PLANKS, PLANKS]], out: { id: DOOR_L, count: 3 } },
     { shape: [[PLANKS, PLANKS, PLANKS], [PLANKS, PLANKS, PLANKS], [null, 101, null]], out: { id: SIGN, count: 3 } },
-    { shape: [[105, 0, 105], [0, 105, 0]], out: { id: 116, count: 1 } }
+    { shape: [[105, 0, 105], [0, 105, 0]], out: { id: 116, count: 1 } },
+    { shape: [[120, 120, 120]], out: { id: 121, count: 1 } },
+    { shape: [[PLANKS, PLANKS], [null, 101], [null, 101]], out: { id: 122, count: 1 } },
+    { shape: [[COBBLE, COBBLE], [null, 101], [null, 101]], out: { id: 123, count: 1 } },
+    { shape: [[101, PLANKS, 101], [101, PLANKS, 101]], out: { id: LADDER, count: 3 } },
+    { shape: [[SAND, SAND], [SAND, SAND]], out: { id: SANDSTONE, count: 1 } },
+    { shape: [[WOOL]], out: { id: 125, count: 2 } },
+    { shape: [[0, 101, 125], [0, 101, 0], [0, 101, 125]], out: { id: 113, count: 1 } }
   ].map((r) => ({ rows: trimShape(r.shape).map((row) => row.map((c) => c || 0)), out: r.out }));
 
   const SMELT = { [IRON_ORE]: 105, [SAND]: GLASS, [COBBLE]: STONE, 103: 110, 104: 111, 114: 115 };
@@ -367,7 +383,177 @@
       ctx.putImageData(img, (idx % COLS) * T, ((idx / COLS) | 0) * T);
     }
 
-    // --- terrain ---
+    // tileN : motif peint DIRECTEMENT en 64×64 (détail réel, pas agrandi)
+    function tileN(idx, fn) {
+      const img = ctx.createImageData(T, T);
+      for (let y = 0; y < T; y++) {
+        for (let x = 0; x < T; x++) {
+          const r = rnd(x, y, idx);
+          const c = fn(x, y, r);
+          const gf = (rnd(x, y, 901 + idx) - 0.5) * 8;
+          const o = (y * T + x) * 4;
+          img.data[o] = cl(c[0] + gf); img.data[o + 1] = cl(c[1] + gf);
+          img.data[o + 2] = cl(c[2] + gf);
+          img.data[o + 3] = c.length > 3 ? c[3] : 255;
+        }
+      }
+      ctx.putImageData(img, (idx % COLS) * T, ((idx / COLS) | 0) * T);
+    }
+
+    // --- terrain (redessiné nativement en 64×64) ---
+    // 0 : herbe haute résolution — taches douces + brins clairs
+    tileN(0, (x, y, r) => {
+      const t1 = (E.hash2(x >> 3, y >> 3, 41) - 0.5) * 30;
+      const t2 = (E.hash2(x >> 2, y >> 2, 412) - 0.5) * 16;
+      let v = 128 + t1 + t2 + (r - 0.5) * 14;
+      if (E.hash2(x, y, 909) > 0.94) v += 26; // brins éclairés
+      else if (E.hash2(x, y, 910) < 0.05) v -= 22; // brins d'ombre
+      return [v * 0.63, v, v * 0.39];
+    });
+    // 1 : côté d'herbe — bord irrégulier 9-13px, transition terre sombre
+    tileN(1, (x, y, r) => {
+      const edge = 9 + ((E.hash2(x, 0, 51) * 4) | 0);
+      const wisp = edge + ((E.hash2(x, 7, 52) * 3) | 0) - 1;
+      if (y < edge) {
+        const t1 = (E.hash2(x >> 2, y >> 2, 412) - 0.5) * 16;
+        let v = 126 + t1 + (r - 0.5) * 12;
+        if (E.hash2(x, y, 909) > 0.94) v += 24;
+        return [v * 0.63, v, v * 0.39];
+      }
+      const m = (r - 0.5) * 10 + (E.hash2(x >> 1, y >> 1, 61) - 0.5) * 14;
+      if (y < wisp + 2) return [116 + m, 156 + m, 60 + m]; // frange
+      return [134 + m, 96 + m, 67 + m]; // terre
+    });
+    // 2 : terre — amas + cailloux + dégradés
+    tileN(2, (x, y, r) => {
+      const t1 = (E.hash2(x >> 3, y >> 3, 610) - 0.5) * 22;
+      const t2 = (E.hash2(x >> 2, y >> 2, 61) - 0.5) * 18;
+      const t3 = (E.hash2(x >> 1, y >> 1, 62) - 0.5) * 8;
+      let rr = 134 + t1 + t2 + t3 + (r - 0.5) * 8;
+      let gg = 96 + t1 * 0.8 + t2 + t3 + (r - 0.5) * 8;
+      let bb = 67 + t1 * 0.6 + t2 * 0.9 + t3 + (r - 0.5) * 8;
+      if (E.hash2(x, y, 63) > 0.94) { rr = 152; gg = 142; bb = 128; } // caillou clair
+      else if (E.hash2(x, y, 64) < 0.04) { rr -= 30; gg -= 24; bb -= 18; } // mots sombres
+      return [rr, gg, bb];
+    });
+    // 3 : pierre — fissures + cailloux à croûte claire/sombre
+    tileN(3, (x, y, r) => {
+      const t1 = (E.hash2(x >> 3, y >> 3, 71) - 0.5) * 20;
+      const t2 = (E.hash2(x >> 2, y >> 2, 72) - 0.5) * 12;
+      let v = 127 + t1 + t2 + (r - 0.5) * 8;
+      const crack = Math.abs(E.hash2((x + ((y >> 3) * 5)) >> 4, y >> 4, 73) - 0.5);
+      const crack2 = Math.abs(E.hash2(x >> 4, (y + ((x >> 3) * 7)) >> 4, 74) - 0.5);
+      if (crack < 0.05 || crack2 < 0.04) v -= 30; // fissures croisées
+      else if (E.hash2(x, y, 75) > 0.93) v += 16; // éclat
+      return [v, v, v];
+    });
+    // 4 : sable — ondulations + paillettes
+    tileN(4, (x, y, r) => {
+      const rip = Math.sin((y + E.hash2(x, 0, 81) * 5) * 0.5) * 7;
+      const t1 = (E.hash2(x >> 2, y >> 2, 82) - 0.5) * 10;
+      let rr = 219 + rip + t1 + (r - 0.5) * 7;
+      let gg = 207 + rip + t1 + (r - 0.5) * 7;
+      let bb = 163 + rip * 0.8 + t1 + (r - 0.5) * 7;
+      if (E.hash2(x, y, 83) > 0.96) { rr += 20; gg += 22; bb += 24; } // grain brillant
+      return [rr, gg, bb];
+    });
+    // 5 : bûche (chêne) — écorce à stries verticales + nœuds
+    tileN(5, (x, y, r) => {
+      const g1 = Math.sin(x * 0.5 + (E.hash2(y >> 4, 0, 84) - 0.5) * 8) * 9;
+      const t1 = (E.hash2(x >> 2, y >> 2, 85) - 0.5) * 12;
+      let rr = 109 + g1 + t1 + (r - 0.5) * 8;
+      let gg = 85 + g1 * 0.9 + t1 + (r - 0.5) * 8;
+      let bb = 51 + g1 * 0.8 + t1 + (r - 0.5) * 8;
+      if (E.hash2(x >> 2, y >> 3, 86) > 0.93 && (y % 20) < 4) { rr -= 30; gg -= 24; bb -= 18; } // nœud
+      return [rr, gg, bb];
+    });
+    // 6 : bûche (dessus) — anneaux concentriques ondulés
+    tileN(6, (x, y, r) => {
+      const d = Math.sqrt((x - 31.5) * (x - 31.5) + (y - 31.5) * (y - 31.5)) + (E.hash2(x >> 2, y >> 2, 86) - 0.5) * 4;
+      const ring = Math.sin(d * 1.3) * 11;
+      const bord = d > 26 ? -16 : 0;
+      const m = (r - 0.5) * 6;
+      return [175 + ring + bord + m, 143 + ring + bord + m, 91 + ring * 0.7 + bord + m];
+    });
+    // 7 : feuilles — feuille épaisse avec trous d'ombre et touffes
+    tileN(7, (x, y, r) => {
+      const hole = E.hash2(x, y, 902);
+      if (hole < 0.09) return [24, 44, 16];      // trou d'ombre
+      const t1 = (E.hash2(x >> 3, y >> 3, 87) - 0.5) * 26;
+      const t2 = (E.hash2(x >> 2, y >> 2, 88) - 0.5) * 14;
+      const dd = Math.sqrt((x - 31.5) * (x - 31.5) + (y - 31.5) * (y - 31.5));
+      const vig = dd > 28 ? -10 : 0;
+      let v = 62 + t1 + t2 + vig + (r - 0.5) * 10;
+      if (hole > 0.95) v += 20; // feuille éclairée
+      return [v * 0.48, v, v * 0.31];
+    });
+    // 9 : planches — planches horizontales de 16px, veinage + clous
+    tileN(9, (x, y, r) => {
+      const board = y >> 4;
+      const seam = (y & 15) === 0;
+      const sb = (E.hash2(board, 7, 88) - 0.5) * 14;
+      const grain = Math.sin(x * 0.25 + board * 9 + (E.hash2(x, 3, 89) - 0.5) * 4) * 6;
+      const t1 = (E.hash2(x >> 2, board * 4 + (y & 15) >> 2, 90) - 0.5) * 8;
+      let rr = 162 + grain + sb + t1 + (r - 0.5) * 6;
+      let gg = 130 + grain + sb + t1 + (r - 0.5) * 6;
+      let bb = 78 + grain * 0.8 + sb + t1 + (r - 0.5) * 6;
+      if (seam) { rr -= 34; gg -= 30; bb -= 24; } // rainure
+      else if (((x & 15) === 3 || (x & 15) === 12) && (y & 15) === 7) { rr -= 24; gg -= 20; bb -= 16; } // clous
+      return [rr, gg, bb];
+    });
+    // 10 : pierre taillée — pierres 16px à coffrage irrégulier
+    tileN(10, (x, y, r) => {
+      const edge = (x & 15) < 2 || (y & 15) < 2;
+      const ss = (E.hash2(x >> 4, y >> 4, 33) - 0.5) * 30;
+      const inner = (E.hash2(x >> 2, y >> 2, 34) - 0.5) * 10;
+      let v = 110 + ss + inner + (r - 0.5) * 8;
+      if (edge) v -= 32;
+      else if (E.hash2(x, y, 35) > 0.94) v += 14;
+      return [v, v, v];
+    });
+    // 15 : gravier — galets de trois tailles
+    tileN(15, (x, y, r) => {
+      const t1 = (E.hash2(x >> 3, y >> 3, 880) - 0.5) * 30;
+      const t2 = (E.hash2(x >> 2, y >> 2, 881) - 0.5) * 22;
+      const t3 = (E.hash2(x >> 1, y >> 1, 882) - 0.5) * 10;
+      let v = 96 + t1 + t2 + t3 + (r - 0.5) * 8;
+      if (E.hash2(x, y, 883) > 0.93) v += 32; // galet clair
+      else if (E.hash2(x, y, 884) < 0.05) v -= 26; // caillou noir
+      return [v, v - 4, v - 9];
+    });
+    // 16 : minerai de charbon — amas noirs à reflet
+    tileN(16, (x, y, r) => {
+      const zone = E.hash2(x >> 3, y >> 3, 716);
+      const dx2 = (x & 7) - 3.5, dy2 = (y & 7) - 3.5;
+      const d = Math.sqrt(dx2 * dx2 + dy2 * dy2) + (E.hash2(x, y, 717) - 0.5) * 2;
+      if (zone > 0.6 && d < 2.6 + zone) {
+        return (d < 1.1) ? [44, 46, 50] : [24, 24, 28]; // morceau brillant
+      }
+      const t1 = (E.hash2(x >> 3, y >> 3, 71) - 0.5) * 20;
+      let v = 127 + t1 + (E.hash2(x >> 2, y >> 2, 72) - 0.5) * 12 + (r - 0.5) * 8;
+      return [v, v, v];
+    });
+    // 17 : minerai de fer — amas ocre à cœur clair
+    tileN(17, (x, y, r) => {
+      const zone = E.hash2(x >> 3, y >> 3, 817);
+      const dx2 = (x & 7) - 3.5, dy2 = (y & 7) - 3.5;
+      const d = Math.sqrt(dx2 * dx2 + dy2 * dy2) + (E.hash2(x, y, 818) - 0.5) * 2;
+      if (zone > 0.6 && d < 2.6 + zone) {
+        return (d < 1.1) ? [232, 196, 170] : [196, 150, 118]; // rouille claire/foncée
+      }
+      const t1 = (E.hash2(x >> 3, y >> 3, 71) - 0.5) * 20;
+      let v = 127 + t1 + (E.hash2(x >> 2, y >> 2, 72) - 0.5) * 12 + (r - 0.5) * 8;
+      return [v, v, v];
+    });
+    // 14 : neige — congères douces + paillettes
+    tileN(14, (x, y, r) => {
+      const t1 = (E.hash2(x >> 3, y >> 3, 950) - 0.5) * 8;
+      const t2 = (E.hash2(x >> 2, y >> 2, 951) - 0.5) * 5;
+      const v = 240 + t1 + t2 + (r - 0.5) * 4;
+      const sp = E.hash2(x, y, 952) > 0.94;
+      return [Math.min(255, v + (sp ? 15 : 0)), Math.min(255, 248 + t2 + (sp ? 15 : 0)), Math.min(255, 252 + t2)];
+    });
+    // --- reste des tuiles (agrandies ×4 + grain) ---
     tile(0, (x, y, r) => {
       const m = n(13, r);
       const patch = E.hash2(x >> 2, y >> 2, 41) < 0.25 ? -11 : 0;
@@ -730,6 +916,120 @@
       const spot = E.hash2(x, y, 995) < 0.13;
       return spot ? [206 + m, 186 + m, 120 + m] : [238 + m, 230 + m, 204 + m];
     });
+    // --- wave 7 : nouvelles tuiles ---
+    tileN(49, (x, y, r) => { // terre labourée : sillons sombres
+      const sillon = (y & 5) === 0;
+      const m = (r - 0.5) * 8;
+      if (sillon) return [66 + m, 45 + m, 27 + m];
+      return [96 + m, 64 + m, 38 + m];
+    });
+    const wheatCols = [12, 19, 26, 33, 40, 47, 54];
+    tileN(50, (x, y) => { // blé jeune : petits brins
+      for (const c of wheatCols) if (Math.abs(x - c) <= 1 && y > 44 && y < 62) return [92, 166, 62];
+      return [0, 0, 0, 0];
+    });
+    tileN(51, (x, y) => { // blé en herbe : tiges hautes
+      for (const c of wheatCols) if (Math.abs(x - c) <= 1 && y > 22) return [142, 178, 72];
+      return [0, 0, 0, 0];
+    });
+    tileN(52, (x, y) => { // blé mûr : tiges dorées + épis
+      for (const c of wheatCols) {
+        if (Math.abs(x - c) <= 1 && y > 12) {
+          if (y < 34) return Math.abs(x - c) <= 2 ? [222, 182, 76] : [206, 160, 62];
+          return [198, 152, 58];
+        }
+      }
+      return [0, 0, 0, 0];
+    });
+    tileN(58, (x, y, r) => { // grès : strates gravées
+      const strate = (E.hash2(0, y >> 4, 9500) - 0.5) * 12;
+      const strita = (y & 15) === 0 || (y & 15) === 1 ? -14 : 0;
+      const m = (r - 0.5) * 6;
+      return [216 + strate + strita + m, 202 + strate + strita + m, 152 + strate * 0.8 + strita + m];
+    });
+    tileN(59, (x, y, r) => { // bouleau : écorce blanche à taches
+      const m = (r - 0.5) * 6;
+      if (E.hash2(x >> 2, y >> 3, 770) > 0.8) return [52 + m, 50 + m, 48 + m];
+      if ((y % 20) < 2) return [166 + m, 162 + m, 156 + m];
+      return [218 + m, 215 + m, 207 + m];
+    });
+    tileN(60, (x, y, r) => { // bouleau : dessus pâle
+      const d = Math.sqrt((x - 31.5) * (x - 31.5) + (y - 31.5) * (y - 31.5)) + (E.hash2(x >> 2, y >> 2, 86) - 0.5) * 4;
+      const ring = Math.sin(d * 1.3) * 8;
+      const bord = d > 26 ? -12 : 0;
+      const m = (r - 0.5) * 5;
+      return [222 + ring + bord + m, 218 + ring + bord + m, 206 + ring * 0.8 + bord + m];
+    });
+    tileN(61, (x, y, r) => { // échelle : montants + barreaux
+      const m = (r - 0.5) * 6;
+      if (x >= 10 && x <= 15) return [146 + m, 116 + m, 66 + m];
+      if (x >= 48 && x <= 53) return [134 + m, 106 + m, 60 + m];
+      if ((y % 14) < 4 && x > 12 && x < 51) return [156 + m, 126 + m, 74 + m];
+      return [0, 0, 0, 0];
+    });
+    tileN(62, (x, y) => { // graines : petits points dispersés
+      for (const sx2 of [14, 20, 27, 33, 40, 47]) {
+        for (const sy2 of [30, 38, 46]) {
+          if (Math.abs(x - sx2) < 2 && Math.abs(y - sy2) < 2) return [116, 160, 60];
+        }
+      }
+      return [0, 0, 0, 0];
+    });
+    tileN(63, (x, y) => { // blé (item) : gerbe dorée
+      for (const off of [-9, 0, 9]) {
+        const cx2 = 32 + off * (58 - y) / 26;
+        if (Math.abs(x - cx2) <= 2 && y > 12 && y < 58) return y < 30 ? [224, 190, 96] : [206, 160, 62];
+      }
+      return [0, 0, 0, 0];
+    });
+    tileN(64, (x, y, r) => { // pain : miche dorée
+      const dx2 = (x - 32) / 26, dy2 = (y - 34) / 15;
+      const dd = dx2 * dx2 + dy2 * dy2;
+      if (dd >= 1) return [0, 0, 0, 0];
+      const m = (r - 0.5) * 6;
+      if (dd > 0.8) return [172 + m, 112 + m, 48 + m];
+      if (Math.abs((x - 32) + (y - 34) * 0.6) % 9 < 2) return [224 + m, 170 + m, 92 + m];
+      return [204 + m, 146 + m, 72 + m];
+    });
+    function hoeArt(head) { // houe : manche diagonale + lame qui descend
+      return (x, y, r) => {
+        const m = (r - 0.5) * 6;
+        const neck = (18 + y - (62 - x)) >= 0; // bas-gauche → haut-droite
+        if (!neck) return [0, 0, 0, 0];
+        if (Math.abs(x + y - 50) <= 1 && x >= 10 && x <= 50) return [126 + m, 92 + m, 50 + m];
+        if (y >= 6 && y <= 14 && x >= 36 && x <= 52 && x + y >= 52) {
+          const edge = (y === 6 || x === 52) ? -22 : 0;
+          return [head[0] + edge + m, head[1] + edge + m, head[2] + edge + m];
+        }
+        return [0, 0, 0, 0];
+      };
+    }
+    tileN(65, hoeArt([172, 134, 78]));   // houe bois
+    tileN(66, hoeArt([122, 124, 130]));  // houe pierre
+    tileN(67, (x, y, r) => { // boule de slime
+      const dx2 = (x - 32) / 20, dy2 = (y - 33) / 18;
+      const dd = dx2 * dx2 + dy2 * dy2;
+      if (dd >= 1) return [0, 0, 0, 0];
+      const m = (r - 0.5) * 8;
+      if (dd < 0.2) return [160 + m, 224 + m, 136 + m]; // éclat
+      if (dd > 0.8) return [52 + m, 128 + m, 48 + m];
+      return [96 + m, 190 + m, 80 + m];
+    });
+    tileN(68, (x, y) => { // fil : ficelle blanche ondulée
+      const cx2 = 32 + Math.sin(y * 0.16) * 13;
+      if (Math.abs(x - cx2) < 2 && y > 5 && y < 59) return Math.abs(x - cx2) < 1 ? [236, 232, 226] : [210, 204, 198];
+      return [0, 0, 0, 0];
+    });
+    tileN(69, (x, y, r) => { // seau d'eau
+      const body = y >= 8;
+      if (body) {
+        if (y === 8 || y === 15 || Math.abs(x - 8) > 5.4) return [(r - 0.5) * 10 + 188, 190 + (r - 0.5) * 10, 196 + (r - 0.5) * 10];
+        return [(r - 0.5) * 8 + 58, (r - 0.5) * 8 + 118, (r - 0.5) * 8 + 196]; // eau
+      }
+      const ans = (y > 1 && y < 8 && Math.abs(x - 8) >= 4.6 && Math.abs(x - 8) <= 5.9 && Math.abs(Math.abs(x - 8) - (8 - Math.min(y, 8)) * 0.72) < 1.15);
+      if (ans) return [(r - 0.5) * 8 + 198, 200 + (r - 0.5) * 8, 208 + (r - 0.5) * 8];
+      return [0, 0, 0, 0];
+    });
     return cv;
   }
   function chunkKey(cx, cz) { return cx + ',' + cz; }
@@ -759,7 +1059,7 @@
             if (h > WATER_LEVEL + 1 && y >= 4 && E.caveAt(x0 + x, y, z0 + z)) id = AIR;
             else id = E.oreAt(x0 + x, y, z0 + z);
           }
-          else if (y < h) id = DIRT;
+          else if (y < h) id = E.subSurfaceBlock(x0 + x, z0 + z, h, y);
           else id = E.surfaceBlock(x0 + x, z0 + z, h);
           data[E.blockIndex(x, y, z)] = id;
         }
@@ -771,6 +1071,14 @@
             if (pr < 0.03) data[E.blockIndex(x, h + 1, z)] = FLOWER_RED;
             else if (pr < 0.06) data[E.blockIndex(x, h + 1, z)] = FLOWER_YELLOW;
             else if (pr < 0.16) data[E.blockIndex(x, h + 1, z)] = TALLGRASS;
+          } else if (biome === 'jungle') {
+            const pr = E.hash2(x0 + x, z0 + z, 9091);
+            if (pr < 0.02) data[E.blockIndex(x, h + 1, z)] = FLOWER_RED;
+            else if (pr < 0.035) data[E.blockIndex(x, h + 1, z)] = FLOWER_YELLOW;
+            else if (pr < 0.34) data[E.blockIndex(x, h + 1, z)] = TALLGRASS;
+          } else if (biome === 'savanna') {
+            const pr = E.hash2(x0 + x, z0 + z, 9091);
+            if (pr < 0.09) data[E.blockIndex(x, h + 1, z)] = TALLGRASS;
           }
         }
       }
@@ -778,7 +1086,7 @@
     for (let wx = x0 - 2; wx < x0 + CHUNK + 2; wx++) {
       for (let wz = z0 - 2; wz < z0 + CHUNK + 2; wz++) {
         if (!E.treeAt(wx, wz)) continue;
-        stampTree(data, x0, z0, wx, wz);
+        stampTree(data, x0, z0, wx, wz, E.biomeAt(wx, wz));
       }
     }
     if (E.hash2(ch.cx, ch.cz, 9001) < 0.05 && x0 >= -160 && x0 < 160 && z0 >= -160 && z0 < 160 &&
@@ -852,16 +1160,46 @@
     villages.push([hx, fy, hz]);
   }
 
-  function stampTree(data, x0, z0, wx, wz) {
+  function setB(data, x0, z0, x, y, z, id, onlyAir) {
+    const lx = x - x0, lz = z - z0;
+    if (lx < 0 || lx >= CHUNK || lz < 0 || lz >= CHUNK || y < 1 || y >= WORLD_H) return;
+    const i = E.blockIndex(lx, y, lz);
+    if (onlyAir && data[i] !== AIR) return;
+    data[i] = id;
+  }
+  function stampTree(data, x0, z0, wx, wz, biome) {
     const h = E.terrainHeight(wx, wz);
+    if (biome === 'jungle') {
+      // grand arbre de jungle : tronc haut, voûte large
+      const thJ = 6 + Math.floor(E.hash2(wx, wz, 4243) * 4);
+      for (let dy = thJ - 4; dy <= thJ; dy++) {
+        const rJ = dy >= thJ - 1 ? 2 : 3;
+        for (let ox = -rJ; ox <= rJ; ox++) {
+          for (let oz = -rJ; oz <= rJ; oz++) {
+            if (Math.abs(ox) === rJ && Math.abs(oz) === rJ && E.hash2(wx + ox, wz + oz, dy * 37) < 0.55) continue;
+            setB(data, x0, z0, wx + ox, h + 1 + dy, wz + oz, LEAVES, true);
+          }
+        }
+      }
+      for (let i = 0; i < thJ; i++) setB(data, x0, z0, wx, h + 1 + i, wz, LOG, false);
+      return;
+    }
+    if (biome === 'savanna') {
+      // acacia : tronc fin + canopée plate large
+      const thS = 4 + Math.floor(E.hash2(wx, wz, 4244) * 2);
+      for (let ox = -3; ox <= 3; ox++) {
+        for (let oz = -3; oz <= 3; oz++) {
+          if (Math.abs(ox) === 3 && Math.abs(oz) === 3) continue;
+          if (E.hash2(wx + ox, wz + oz, 78) < 0.2) continue;
+          const yTop = h + 1 + thS + (Math.abs(ox) + Math.abs(oz) > 3 ? 0 : 1);
+          setB(data, x0, z0, wx + ox, yTop, wz + oz, LEAVES, true);
+        }
+      }
+      for (let i = 0; i < thS + 2; i++) setB(data, x0, z0, wx, h + 1 + i, wz, LOG, false);
+      return;
+    }
     const th = 4 + Math.floor(E.hash2(wx, wz, 4242) * 2);
-    const set = (x, y, z, id, onlyAir) => {
-      const lx = x - x0, lz = z - z0;
-      if (lx < 0 || lx >= CHUNK || lz < 0 || lz >= CHUNK || y < 1 || y >= WORLD_H) return;
-      const i = E.blockIndex(lx, y, lz);
-      if (onlyAir && data[i] !== AIR) return;
-      data[i] = id;
-    };
+    const set = (x, y, z, id, onlyAir) => setB(data, x0, z0, x, y, z, id, onlyAir);
     for (let dy = th - 2; dy <= th + 1; dy++) {
       const r = dy <= th - 1 ? 2 : 1;
       for (let ox = -r; ox <= r; ox++) {
@@ -948,6 +1286,8 @@
     ch.data[idx] = id;
     if (old === SIGN) signData.delete(x + ',' + y + ',' + z);
     if (old === DOOR_L || old === DOOR_U) doorOpen.delete(doorLowerKeyAt(x, y, z, old));
+    if (old === WHEAT1 || old === WHEAT2 || old === WHEAT3) wheatGrow.delete(x + ',' + y + ',' + z);
+    if (id === WHEAT1 || id === WHEAT2) wheatGrow.add(x + ',' + y + ',' + z);
     if (id === CHEST) {
       const ck = x + ',' + y + ',' + z;
       if (!chestData.has(ck)) chestData.set(ck, new Array(27).fill(null));
@@ -1178,6 +1518,25 @@
       }
     }
   }
+  function pushLadder(t, x, y, z, tileIdx, tl, wx, wz) {
+    // Rail vertical plaqué au premier mur solide voisin (ou plan z par défaut)
+    const opts = [
+      [[0.97, 0, 0], [0.97, 0, 1], [0.97, 1, 1], [0.97, 1, 0]],
+      [[0.03, 0, 0], [0.03, 0, 1], [0.03, 1, 1], [0.03, 1, 0]],
+      [[0, 0, 0.03], [1, 0, 0.03], [1, 1, 0.03], [0, 1, 0.03]],
+      [[0, 0, 0.97], [1, 0, 0.97], [1, 1, 0.97], [0, 1, 0.97]]
+    ];
+    const lku = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    let quad = null;
+    for (let i = 0; i < 4; i++) {
+      const bid = getBlock(wx + lku[i][0], y, wz + lku[i][1]);
+      if (E.isSolid(bid)) { quad = opts[i]; break; }
+    }
+    if (!quad) quad = opts[3];
+    x0q = x; y0q = y; z0q = z;
+    pushQuad(t, quad, [[0.19, 0.06], [0.81, 0.06], [0.81, 0.94], [0.19, 0.94]], tileIdx, tl);
+    pushQuad(t, quad.slice().reverse(), [[0.19, 0.94], [0.81, 0.94], [0.81, 0.06], [0.19, 0.06]], tileIdx, tl);
+  }
 
   function pushCross(buf, x, y, z, tileIdx, tl) {
     const tcol = tileIdx % 8, trow = (tileIdx / 8) | 0;
@@ -1223,6 +1582,7 @@
           if (b.plant) { pushCross(opq, x, y, z, b.side, torchLightAt(wx, y, wz)); continue; }
           if (b.door) { pushDoor(opq, x, y, z, id, torchLightAt(wx, y, wz), wx, y, wz); continue; }
           if (b.sign) { pushSign(opq, x, y, z, b.side, torchLightAt(wx, y, wz)); continue; }
+          if (b.ladder) { pushLadder(opq, x, y, z, b.side, torchLightAt(wx, y, wz), wx, wz); continue; }
           const isW = E.isWater(id);
           const t = isW ? wat : opq;
           let topH = 1;
@@ -1366,6 +1726,8 @@
     player.vel.z += (tvz - player.vel.z) * k;
 
     player.inWater = E.isWater(getBlock(Math.floor(player.pos.x), Math.floor(player.pos.y + 0.2), Math.floor(player.pos.z)));
+    const feetB2 = getBlock(Math.floor(player.pos.x), Math.floor(player.pos.y + 0.4), Math.floor(player.pos.z));
+    const onLadder = !!(BLOCKS[feetB2] && BLOCKS[feetB2].ladder);
 
     if (player.fly) {
       let tvy = 0;
@@ -1377,6 +1739,9 @@
       player.vel.y -= GRAVITY * 0.18 * dt;
       if (keys.has('Space')) player.vel.y = Math.min(player.vel.y + 30 * dt, 3.4);
       if (player.vel.y < -1.8) player.vel.y = -1.8;
+      player.fallStartY = null;
+    } else if (onLadder) {
+      player.vel.y = keys.has('Space') ? 3.3 : -0.7;
       player.fallStartY = null;
     } else {
       player.vel.y -= GRAVITY * dt;
@@ -1833,6 +2198,9 @@
     matWater.uniforms.fogColor.value.copy(col);
   }
 
+  const BIOME_FR = { plains: 'Plaines', forest: 'For\u00eat', desert: 'D\u00e9sert',
+    snow: 'Ta\u00efga', jungle: 'Jungle', savanna: 'Savane' };
+
   const mobs = [];
   const MOB_DEFS = {
     pig: {
@@ -1874,6 +2242,21 @@
       hp: 12, speed: 2.6, hw: 0.22, hh: 2.7,
       body: 0x161016, head: 0x1a1520, leg: 0x120e12,
       drops: [], xp: 5
+    },
+    spider: {
+      hp: 8, speed: 2.9, hw: 0.5, hh: 0.75,
+      body: 0x2a2226, head: 0x362c30, leg: 0x211b1e,
+      drops: [{ id: 125, min: 0, max: 2 }], xp: 5
+    },
+    slime: {
+      hp: 6, speed: 1.1, hw: 0.5, hh: 0.85,
+      body: 0x5fbb52, head: 0x5fbb52, leg: 0x5fbb52,
+      drops: [{ id: 124, min: 1, max: 2 }], xp: 4
+    },
+    slime_small: {
+      hp: 2, speed: 1.4, hw: 0.26, hh: 0.42,
+      body: 0x5fbb52, head: 0x5fbb52, leg: 0x5fbb52,
+      drops: [{ id: 124, min: 0, max: 1 }], xp: 1
     }
   };
 
@@ -2000,6 +2383,22 @@
       if (y === 1 && (x === 1 || x === 2 || x === 5 || x === 6)) return [112, 40, 160];
       return [14, 12, 18];
     });
+    MOBTEX.spSkin = tex8((x, y) => nz(x, y, 21, [42, 34, 38], 12));
+    MOBTEX.spLeg = tex8((x, y) => nz(x, y, 22, [34, 27, 30], 10));
+    MOBTEX.spFace = tex8((x, y) => { // 8 yeux rouges sur grille 8
+      const eyes = [[1, 2], [2, 2], [5, 2], [6, 2], [1, 3], [2, 3], [5, 3], [6, 3]];
+      if (eyes.some((e) => e[0] === x && e[1] === y)) return (x === 1 || x === 6) ? [140, 22, 16] : [214, 46, 40];
+      return nz(x, y, 21, [42, 34, 38], 12);
+    });
+    MOBTEX.slSkin = tex8((x, y) => {
+      const m = nz(x, y, 23, [95, 187, 82], 12);
+      return y <= 2 ? [Math.min(255, m[0] + 12), Math.min(255, m[1] + 14), Math.min(255, m[2] + 12)] : m;
+    });
+    MOBTEX.slFace = tex8((x, y) => {
+      if (y === 3 && (x === 2 || x === 5)) return [18, 28, 18]; // yeux noirs
+      if (y === 5 && x >= 3 && x <= 4) return [140, 60, 55]; // bouche
+      return nz(x, y, 23, [95, 187, 82], 12);
+    });
   })();
 
   function makeMobMesh(type) {
@@ -2074,6 +2473,22 @@
       part(0.12, 1.3, 0.12, T.eSkin, null, 0.28, 1.55, 0);
       part(0.12, 1.35, 0.12, T.eSkin, null, -0.11, 0.68, 0);
       part(0.12, 1.35, 0.12, T.eSkin, null, 0.11, 0.68, 0);
+    } else if (type === 'spider') {
+      part(0.62, 0.34, 0.7, T.spSkin, null, 0, 0.42, 0.14);
+      part(0.42, 0.42, 0.42, T.spSkin, T.spFace, 0, 0.5, -0.44);
+      part(0.09, 0.5, 0.09, T.spLeg, null, -0.36, 0.34, -0.26, 0.7);
+      part(0.09, 0.5, 0.09, T.spLeg, null, 0.36, 0.34, -0.26, -0.7);
+      part(0.09, 0.5, 0.09, T.spLeg, null, -0.4, 0.34, 0.0, 0.2);
+      part(0.09, 0.5, 0.09, T.spLeg, null, 0.4, 0.34, 0.0, -0.2);
+      part(0.09, 0.5, 0.09, T.spLeg, null, -0.36, 0.34, 0.26, -0.4);
+      part(0.09, 0.5, 0.09, T.spLeg, null, 0.36, 0.34, 0.26, 0.4);
+      part(0.07, 0.34, 0.07, T.spLeg, null, -0.28, 0.3, 0.5, -0.9);
+      part(0.07, 0.34, 0.07, T.spLeg, null, 0.28, 0.3, 0.5, 0.9);
+    } else if (type === 'slime') {
+      part(0.85, 0.85, 0.85, T.slSkin, T.slFace, 0, 0.43, -0.08);
+      part(0.5, 0.5, 0.5, T.slSkin, null, 0, 0.34, -0.06); // noyau
+    } else if (type === 'slime_small') {
+      part(0.42, 0.42, 0.42, T.slSkin, T.slFace, 0, 0.21, -0.04);
     } else { // squelette
       part(0.5, 0.5, 0.5, T.bone, T.skFace, 0, 1.72, 0);
       part(0.4, 0.75, 0.16, T.ribs, null, 0, 1.1, 0);
@@ -2117,6 +2532,12 @@
     const i = mobs.indexOf(m);
     if (i >= 0) mobs.splice(i, 1);
     scene.remove(m.mesh);
+    if (m.type === 'slime' && !m.split) {
+      for (let k = 0; k < 2; k++) {
+        const s = spawnMob('slime_small', m.pos.x + (k === 0 ? -0.5 : 0.5), m.pos.y + 0.3, m.pos.z + 0.2);
+        s.split = true;
+      }
+    }
     if (byPlayer) {
       for (const d of rollDrops(m.def)) addItem(d[0], d[1]);
       addXp(m.def.xp || 1);
@@ -2134,7 +2555,8 @@
     }
     const hostile = gameMode === 'survival' && !player.dead &&
       ((m.type === 'enderman' && (m.mad || dayLight < 0.45)) ||
-        (m.type === 'zombie' ? dayLight < 0.45 : m.type === 'creeper' || m.type === 'skeleton'));
+        m.type === 'slime' || m.type === 'slime_small' ||
+        (m.type === 'zombie' || m.type === 'spider' ? dayLight < 0.55 : m.type === 'creeper' || m.type === 'skeleton'));
     if (hostile) {
       const tDist = Math.hypot(player.pos.x - m.pos.x, player.pos.z - m.pos.z);
       m.yaw = Math.atan2(m.pos.x - player.pos.x, m.pos.z - player.pos.z);
@@ -2150,7 +2572,7 @@
         m.moving = true;
         if (tDist < 1.6 && Math.abs(player.pos.y - m.pos.y) < 2 && m.atkT <= 0) {
           m.atkT = 1.2;
-          damagePlayer(2, player.pos.x - m.pos.x, player.pos.z - m.pos.z);
+          damagePlayer(m.type === 'slime_small' ? 1 : 2, player.pos.x - m.pos.x, player.pos.z - m.pos.z);
         }
       }
       if (m.type === 'creeper') {
@@ -2170,6 +2592,10 @@
         playSound(55 + Math.random() * 25, 0.6, 0.07, 'sawtooth');
       } else if (m.type === 'enderman' && Math.random() < dt * 0.06) {
         playSound(95, 0.45, 0.08, 'sawtooth');
+      } else if (m.type === 'spider' && Math.random() < dt * 0.05) {
+        playSound(700 + Math.random() * 180, 0.16, 0.05, 'square');
+      } else if ((m.type === 'slime' || m.type === 'slime_small') && m.onGround && m.moving) {
+        playSound(m.type === 'slime' ? 140 : 190, 0.12, 0.05, 'square');
       }
     } else {
       if (m.type === 'enderman' && gameMode === 'survival' && !player.dead) {
@@ -2200,6 +2626,10 @@
           else playSound(m.type === 'pig' ? 175 + Math.random() * 45 : 235 + Math.random() * 45, 0.3, 0.07, 'square');
         }
       }
+    }
+    if ((m.type === 'slime' || m.type === 'slime_small') && m.onGround) {
+      m.moving = true;
+      if (Math.random() < dt * 1.6) { m.vel.y = 4.6; m.onGround = false; }
     }
     const speed = m.moving ? m.def.speed : 0;
     const dx = -Math.sin(m.yaw) * speed, dz = -Math.cos(m.yaw) * speed;
@@ -2418,7 +2848,7 @@
     const night = dayLight < 0.45;
     if (Math.random() > (night ? 0.7 : 0.4)) return;
     const pool = night
-      ? ['zombie', 'zombie', 'skeleton', 'skeleton', 'creeper', 'pig', 'sheep', 'enderman']
+      ? ['zombie', 'zombie', 'skeleton', 'skeleton', 'creeper', 'pig', 'sheep', 'enderman', 'spider', 'spider', 'slime', 'slime']
       : ['pig', 'sheep', 'cow', 'cow', 'chicken'];
     const type = pool[(Math.random() * pool.length) | 0];
     let count = 0;
@@ -2796,6 +3226,8 @@
     [GLASS]: 0.5, [TORCH]: 0.1,
     [FLOWER_RED]: 0.05, [FLOWER_YELLOW]: 0.05, [TALLGRASS]: 0.05, [BED]: 0.2, [CHEST]: 1.6,
     [DOOR_L]: 1.2, [DOOR_U]: 1.2, [SIGN]: 0.8,
+    [FARMLAND]: 0.6, [WHEAT1]: 0.01, [WHEAT2]: 0.01, [WHEAT3]: 0.01,
+    [BIRCH_LOG]: 1.5, [SANDSTONE]: 1.3, [LADDER]: 0.4,
     [STONE]: 2.4, [COBBLE]: 2.4, [BRICK]: 2.4,
     [COAL_ORE]: 2.8, [IRON_ORE]: 3.2, [FURNACE]: 3.5
   };
@@ -2806,6 +3238,7 @@
   let mouseLeftDown = false;
   let stepT = 1.5, wasInWater = false, fallTimer = 0;
   const fallQueue = new Set();
+  const wheatGrow = new Set(); let wheatTickT = 0;
 
   const particles = [];
   const particleGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
@@ -2822,7 +3255,7 @@
     return it && it.pick ? it.pick : null;
   }
   function isStoneLike(id) {
-    return id === STONE || id === COBBLE || id === BRICK || id === COAL_ORE || id === IRON_ORE || id === FURNACE;
+    return id === STONE || id === COBBLE || id === BRICK || id === COAL_ORE || id === IRON_ORE || id === FURNACE || id === SANDSTONE;
   }
   function breakBlockAt(x, y, z, id, canDrop) {
     if (id === CHEST) spillChest(x, y, z);
@@ -2838,6 +3271,7 @@
     if (canDrop === false || gameMode === 'creative') return;
     const drop = dropFor(id, heldTool());
     if (drop !== null) addItem(drop, 1);
+    if (id === WHEAT3) addItem(119, 1 + (Math.random() < 0.5 ? 1 : 0));
     if (gameMode === 'survival' && id === COAL_ORE) addXp(1);
     if (gameMode === 'survival' && id === IRON_ORE) addXp(2);
   }
@@ -2972,7 +3406,10 @@
 
   function dropFor(id, tool) {
     if (id === GRASS) return DIRT;
-    if (id === TALLGRASS) return null;
+    if (id === TALLGRASS) return Math.random() < 0.55 ? 119 : null;
+    if (id === WHEAT1 || id === WHEAT2) return Math.random() < 0.4 ? 119 : null;
+    if (id === WHEAT3) return 120;
+    if (id === FARMLAND) return DIRT;
     if (id === DOOR_U) return DOOR_L;
     if (id === DOOR_L) return DOOR_L;
     if (isStoneLike(id)) {
@@ -3033,18 +3470,14 @@
     craftResult = null;
     selectedSlot = 0;
     if (gameMode === 'creative') {
-      [GRASS, DIRT, STONE, SAND, LOG, LEAVES, PLANKS, COBBLE, GLASS, BRICK,
-       SNOW, GRAVEL, WOOL, COAL_ORE, IRON_ORE, TABLE, TORCH,
-       FLOWER_RED, FLOWER_YELLOW, TALLGRASS, BED, CHEST, FURNACE, DOOR_L, SIGN].forEach((id, i) => {
+      [GRASS, DIRT, STONE, SAND, SANDSTONE, GRAVEL, LOG, BIRCH_LOG, LEAVES, PLANKS,
+       COBBLE, GLASS, BRICK, SNOW, WOOL, COAL_ORE, IRON_ORE, TABLE, FARMLAND, LADDER,
+       FLOWER_RED, FLOWER_YELLOW, TALLGRASS, BED, CHEST, FURNACE, DOOR_L, SIGN,
+       119, 120, 121, 124, 125, 126, 116, 118].forEach((id, i) => {
         inv[i] = { id, count: 64 };
       });
-      inv[22] = { id: 107, count: 1 };
-      inv[23] = { id: 108, count: 1 };
-      inv[24] = { id: 109, count: 1 };
-      inv[25] = { id: 113, count: 1 };
-      inv[26] = { id: 112, count: 64 };
-      inv[27] = { id: 116, count: 1 };
-      inv[28] = { id: 118, count: 16 };
+      inv[34] = { id: 107, count: 1 };
+      inv[35] = { id: 112, count: 64 };
     }
     xp = 0; xpLevel = 0;
     updateHealthUI();
@@ -3225,7 +3658,8 @@
       '<br>Chunk: ' + Math.floor(bx / CHUNK) + ' ' + Math.floor(bz / CHUNK) +
       '<br>Direction: ' + facing +
       '<br>Temps: ' + phase + ' (' + hour + 'h, lumi\u00e8re ' + dayLight.toFixed(2) + ')' +
-      '<br>Biome: ' + E.biomeAt(bx, bz) +
+      '<br>Biome: ' + (BIOME_FR[E.biomeAt(bx, bz)] || E.biomeAt(bx, bz)) +
+      '<br>M\u00e9t\u00e9o: ' + (weather === 'pluie' ? 'Pluie' : weather === 'neige' ? 'Neige' : 'Clair') +
       '<br>Chunks: ' + chunks.size + ' (file: ' + meshQueue.length + ', \u00e9dits: ' + editCount + ')' +
       '<br>Mobs: ' + mobs.length +
       '<br>Mode: ' + (gameMode === 'creative' ? 'Cr\u00e9atif' : 'Survie') +
@@ -3368,7 +3802,52 @@
       if (!held) return;
       if (held.id >= 100) {
         const it = ITEMS[held.id];
+        if (it.hoe) { // labourer l'herbe/la terre devant soi
+          const fx = currentHit.x, fy = currentHit.y, fz = currentHit.z;
+          const above = getBlock(fx, fy + 1, fz);
+          if ((hitId2 === GRASS || hitId2 === DIRT) && (above === AIR || (BLOCKS[above] && (BLOCKS[above].plant || BLOCKS[above].sign)))) {
+            if (getBlock(fx, fy + 1, fz) !== AIR) applyBlock(fx, fy + 1, fz, AIR, true);
+            applyBlock(fx, fy, fz, FARMLAND, true);
+            spawnBlockParticles(fx, fy, fz, DIRT);
+            playSound(90, 0.2, 0.12, 'triangle');
+            swingT = 1;
+          } else if (gameMode === 'survival') showToast('Laboure de la terre ou de l\u2019herbe (pas de bloc au-dessus)');
+          return;
+        }
+        if (it.seeds) { // semer sur la terre labourée
+          if (hitId2 === FARMLAND && getBlock(currentHit.x, currentHit.y + 1, currentHit.z) === AIR) {
+            held.count--;
+            if (held.count <= 0) inv[selectedSlot] = null;
+            applyBlock(currentHit.x, currentHit.y + 1, currentHit.z, WHEAT1, true);
+            playSound(210, 0.15, 0.08, 'triangle');
+            swingT = 1;
+            updateHotbarUI();
+          } else if (gameMode === 'survival') showToast('Sème sur une terre labour\u00e9e (houe sur la terre)');
+          return;
+        }
+        if (held.id === 126) { // seau d'eau : verser au-dessus du bloc visé
+          if (gameMode === 'creative') {
+            applyBlock(currentHit.x, currentHit.y + 1, currentHit.z, WATER, true);
+            playSound(200, 0.3, 0.1, 'sine');
+          } else {
+            applyBlock(currentHit.x, currentHit.y + 1, currentHit.z, WATER, true);
+            held.count--; // le seau se vide (un seau d'eau posé disparaît → reste un seau vide)
+            if (held.count <= 0) inv[selectedSlot] = null;
+            addItem(116, 1);
+            playSound(200, 0.3, 0.1, 'sine');
+            updateHotbarUI();
+          }
+          return;
+        }
         if (held.id === 116) {
+          if (E.isWater(hitId2)) { // ramasser l'eau visée
+            held.count--;
+            if (held.count <= 0) inv[selectedSlot] = null;
+            addItem(126, 1);
+            swingT = 1;
+            playSound(210, 0.3, 0.1, 'sine');
+            return;
+          }
           const mob = pickMob();
           if (mob && mob.type === 'cow') {
             held.count--;
@@ -3555,6 +4034,71 @@
   applyRenderDistance();
 
   let lastTime = performance.now();
+  function tickWheat(dt) {
+    wheatTickT -= dt;
+    if (wheatTickT > 0) return;
+    wheatTickT = 2;
+    for (const key of Array.from(wheatGrow)) {
+      const pr = key.split(',');
+      const x = +pr[0], y = +pr[1], z = +pr[2];
+      const id = getBlock(x, y, z);
+      if (id !== WHEAT1 && id !== WHEAT2) { wheatGrow.delete(key); continue; }
+      if (!chunks.has(chunkKey(Math.floor(x / CHUNK), Math.floor(z / CHUNK)))) continue;
+      if (Math.random() < 0.55) applyBlock(x, y, z, id + 1, true);
+    }
+  }
+
+  // ---------------- meteo (pluie / neige) ----------------
+  let weather = 'clair';
+  let weatherTimer = 60 + Math.random() * 120;
+  const rainGroup = new THREE.Group();
+  rainGroup.visible = false;
+  scene.add(rainGroup);
+  const rainMat = new THREE.MeshBasicMaterial({ color: 0x4d6e9e, transparent: true, opacity: 0.6 });
+  const snowMat = new THREE.MeshBasicMaterial({ color: 0xf0f4fa, transparent: true, opacity: 0.85 });
+  const rainGeoD = new THREE.BoxGeometry(0.03, 0.6, 0.03);
+  const rainDrops = [];
+  for (let i = 0; i < 130; i++) {
+    const dm = new THREE.Mesh(rainGeoD, rainMat);
+    dm.position.set(0, -10, 0);
+    rainGroup.add(dm);
+    rainDrops.push(dm);
+  }
+  function updateWeather(dt) {
+    weatherTimer -= dt;
+    if (weatherTimer <= 0) {
+      const was = weather;
+      if (weather === 'clair') weather = Math.random() < 0.55 ? 'pluie' : 'neige';
+      else weather = 'clair';
+      weatherTimer = weather === 'clair' ? 90 + Math.random() * 180 : 40 + Math.random() * 80;
+      if (was !== weather) {
+        rainGroup.visible = weather !== 'clair';
+        for (const d of rainDrops) d.material = weather === 'neige' ? snowMat : rainMat;
+        baseFogNear = weather === 'clair' ? 40 : 24;
+        baseFogFar = weather === 'clair' ? 80 : 54;
+        if (gameState === 'playing') {
+          showToast(weather === 'clair' ? 'Le ciel se dégage' :
+            weather === 'pluie' ? 'Il se met à pleuvoir…' : 'Il se met à neiger…');
+          playSound(weather === 'clair' ? 640 : 950, 0.5, 0.035, 'square');
+          blockSound(weather === 'clair' ? 1 : 3);
+        }
+      }
+    }
+    if (weather === 'clair') return;
+    const snowF = weather === 'neige';
+    const spd = snowF ? 3.5 : 28;
+    const px = player.pos.x, py = player.pos.y, pz = player.pos.z;
+    for (const d of rainDrops) {
+      if (d.position.y === -10 || Math.abs(d.position.x - px) > 20 ||
+          Math.abs(d.position.z - pz) > 20 || d.position.y < py - 10 ||
+          d.position.y > py + 30) {
+        d.position.set(px + (Math.random() - 0.5) * 36, py + 14 + Math.random() * 8, pz + (Math.random() - 0.5) * 36);
+      }
+      d.position.y -= spd * dt;
+      if (snowF) d.position.x += Math.sin(d.position.y * 1.3) * 0.5 * dt;
+    }
+  }
+
   function animate() {
     requestAnimationFrame(animate);
     const now = performance.now();
@@ -3643,6 +4187,8 @@
       updateSignRead();
       miniTimer -= dt;
       if (miniTimer <= 0) { miniTimer = 0.25; updateMinimap(); }
+      tickWheat(dt);
+      updateWeather(dt);
       tickMusic(dt);
       netTick(dt);
     }
@@ -3919,6 +4465,7 @@
     spawnPlayerArrow,
     toggleDoorAt, doorOpen, signData, openSignEdit, closeSignEdit, throwEgg,
     toggleMusic,
+    tickWheat, wheatGrow, updateWeather, get weather() { return weather; },
     updateMinimap, MINI_COLORS,
     get musicOn() { return musicOn; },
     netStart: (r) => startNet(r), netEnd, netOutBlock, currentNetRole, netState,

@@ -26,9 +26,11 @@ Lancer en local : double-cliquez `index.html` ou `npx serve .`
 - Génération procédurale par graine (champ « Graine »), collines, plages,
   océans avec eau animée qui coule, étage de bedrock irrégulier.
 - **Grottes** creusées par double bruit 3D (densité proche du vrai MC).
-- **4 biomes** : plaines, forêt (arbres denses), désert (sans arbres),
-  neige — herbes hautes et fleurs (coquelicot, pissenlit) en croix dans les plaines/forêts.
-- Sable et gravier **tombent** s'ils ne sont pas soutenus.
+- **6 biomes** : plaines, forêt (chêne), désert (sans arbres,
+  **sous-sol en grès**), neige, **jungle** (végétation très dense) et
+  **savane** (acacias à canopée plate) — herbes hautes et fleurs selon le biome.
+- Sable et gravier **tombent** s'ils ne sont pas soutenus ; **4 sables (2×2)
+  → grès** comme dans le vrai MC (le verre se cuit au four).
 - Minerais : charbon, fer (le fer se récolte dès la pioche en bois, comme dans le vrai jeu).
 - **Torches** qui éclairent réellement la zone (lumière bloquée
   par les murs), ciel qui change (aube/jour/crépuscule/nuit), étoiles, **nuages qui dérivent**.
@@ -57,6 +59,28 @@ Lancer en local : double-cliquez `index.html` ou `npx serve .`
 - **Musique d'ambiance calme** (arpèges doux, touche **M** pour couper),
   tonalité plus grave la nuit.
 
+**Agriculture (blé)**
+- **Houe en bois ou en pierre** : clic droit sur de l'herbe/la terre → **terre
+  labourée** (sillons). Le bloc au-dessus doit être libre.
+- **Graines** : cassées des herbes hautes (≈ 55 %) ou du blé en croissance (40 %).
+- Clic droit sur la terre labourée → **semis** ; le blé **pousse en 3 stades**
+  (jeune → tiges → gerbe dorée) avec le temps, chunk chargé.
+- **Récolte** : casser la gerbe dorée donne du **blé** (+ graines à 50 %).
+- **Pain** : 3 blés en ligne → restaure 5 points de faim.
+
+**Échelles & seau d'eau**
+- **Échelle** (recette : 2 lignes « bâton-planche-bâton ») → 3 échelles, se pose
+  contre un mur. **Escalade façon MC** : Espace pour monter, sinon descente
+  contrôlée — aucun dégât de chute sur une échelle.
+- **Seau d'eau** (recette : 3 lingots en V) : clic droit sur l’eau → **seau
+  plein** ; clic droit ensuite → **verse une source** (l'eau s'écoule comme dans
+  le vrai jeu) et le seau revient vide.
+
+**Météo**
+- **Pluie ou neige** (selon le biome) arrivent et repartent au hasard : 130
+  gouttes/flocs autour du joueur, **brouillard plus dense**, flocons qui
+  flottent en zigzag, son de pluie, F3 affiche la météo.
+
 **Mobs**
 - Cochons et moutons (viande + laine) le jour, **zombies, squelettes (tirent des flèches)
   et creepers (explosion destructrice)** la nuit.
@@ -64,6 +88,11 @@ Lancer en local : double-cliquez `index.html` ou `npx serve .`
 - **Modèles et textures refaits façon Minecraft** : proportions du vrai jeu, visages
   peints à la main (groin du cochon, camo du creeper, orbites du squelette), zombie
   aux bras tendus, squelette qui tient son arc.
+- **Araignée** (la nuit) : large et rapide, 8 yeux rouges, céphalothorax plat
+  et 8 pattes fines. Lâche du **fil** ; 3 fils en colonne → **laine**.
+- **Slimes** (la nuit) : cube vert qui **saute par bonds**. Quand tu tues un
+  grand slime, **il se scinde en 2 petits slimes** (comme dans le vrai jeu) ;
+  les petits lâchent des **boules de slime**.
 - Les **squelettes lâchent des flèches** à leur mort (comme dans MC).
 - **Enderman** (la nuit) : grand et noir aux yeux violets. Ne l'attaque pas
   sans raison — **le regarder directement le met en colère** (comme dans le
@@ -87,8 +116,8 @@ Lancer en local : double-cliquez `index.html` ou `npx serve .`
 
 **Combat**
 - **Arc** : maintenez le clic droit pour bander l'arc, relâchez pour tirer — les
-  dégâts (1 à 9) et la portée dépendent de la charge. Recette : 3 bâtons + 3 laines
-  (faute d'araignées, la laine tient lieu de corde).
+  dégâts (1 à 9) et la portée dépendent de la charge. Recette : 3 bâtons + 3
+  laines **ou 3 bâtons + 2 fils** (la vraie recette MC, désormais avec du fil).
 - **Flèches** : gravier + bâton + laine → 4 flèches (le gravier tient lieu de silex).
   Nécessaires en survie ; parfois récupérables quand elles touchent un bloc.
 - Épées en bois et en fer, plastron de fer, recul sur les mobs touchés.
@@ -101,9 +130,10 @@ Lancer en local : double-cliquez `index.html` ou `npx serve .`
 - **Infobulle** : survolez un objet (inventaire, coffre, four) → son nom s'affiche
   près du curseur, comme dans Minecraft.
 - Craft 2×2 à la main, **table de craft 3×3** (planche ×4).
-- Recettes : planches, bâtons, torche, verre, pierre taillée, **table de craft**,
+- Recettes : planches, bâtons, torche, pierre taillée, **table de craft**,
   épée en bois, **pioche en bois et en fer** (indispensables pour la pierre et le fer),
-  **four** (8 pierres taillées), arc, flèches.
+  **four** (8 pierres taillées), arc (laine ou fil), flèches,
+  **grès (4 sables), échelle, houes bois/pierre, pain**, laine → **2 fils**.
 - **Four** (clic droit pour ouvrir) : cuisez minerai de fer → lingot, sable → verre,
   pierre taillée → pierre, porc/mouton crus → cuits (bien plus nourrissants).
   Combustibles : charbon (8 fontes), bûches et planches (1,5), bâtons (0,5), laine (0,25).
@@ -186,7 +216,7 @@ a été recréé de zéro pixel par pixel en reprenant les codes visuels emblém
 ## Vérification
 
 Suite de tests sans navigateur : `node /tmp/smoke.js` (harnais VM Node) —
-101 contrôles : moteur, grottes, biomes, craft, minage/délais, drops, faim/regen,
+120 contrôles : moteur, grottes, 6 biomes, craft, minage/délais, drops, faim/regen,
 explosions, squelettes/flèches, XP, sable, jour/nuit, mobs, particules,
 sortie d'eau, lit/dormir, armure, coffres persistants, villages,
 four (fabrication, fusion, jauges), infobulle des noms, arc (tir, dégâts,
@@ -195,8 +225,19 @@ kill avec butin et XP), flèches des squelettes,
 vaches/poules, seau/lait/œufs lançables, sprint sur R, multijoueur complet
 (poignée de main hôte/invité, **lobby avec code affiché avant lancement**, graine imposée, blocs partagés),
 minimap (couleurs + mise à jour), enderman (spawn, aggro par le regard,
-aggro en mélée/fleche → téléportation)**.
+aggro en mélée/flèche → téléportation),
+**wave 7 : recettes pain/échelle/grès/arc-au-fil, agriculture complète
+(labour → semis → croissance → récolte), descente sur échelle, araignée
+(spawn + modèle), slime et scission en 2 petits, météo (transition pluie/neige
++ brouillard), préremplissage créatif à 36 emplacements**.
 
 - **v9c** : atlas de textures passé en **64×64 par tuile** et skins des mobs en **32×32** :
   chaque motif reste peint à la main, agrandi proprement ×4 avec un grain fin par pixel
-  (look « faithfully »), sans copier aucune ressource Mojang.
+  (look « faithful »), sans copier aucune ressource Mojang.
+- **v10 (wave 7)** : **14 tuiles majeures redessinées nativement** en 64×64
+  (un pixel = un pixel : herbe multi-octaves, terre à cailloux, pierre fissurée,
+  sable ondulé, écorce à stries, anneaux de bûche, feuilles percées d'ombre,
+  planches à rainures et clous, moellons, neige, gravier, charbon et fer par
+  amas) ; **tuiles nouvelles** : terre labourée, 3 stades de blé, grès à
+  strates, écorce/anneaux de bouleau, échelle, graines, gerbe de blé, pain,
+  houes, boule de slime, fil, seau plein — toutes peintes pixel par pixel.
