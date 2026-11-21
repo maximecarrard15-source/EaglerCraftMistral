@@ -153,6 +153,22 @@ Lancer en local : double-cliquez `index.html` ou `npx serve .`
 - **Sortie d'eau façon Minecraft** : en nageant contre un bord, vous êtes
   automatiquement propulsé hors de l'eau, même sur un bloc à la même hauteur.
 
+## Inventaire créatif (mode créatif, touche E)
+
+Façon Minecraft 1.14, un écran dédié s'ouvre à la place de l'inventaire :
+- **Onglets** en haut : Tout, **Blocs & construction**, **Nature**,
+  **Fonctionnel** (torches, coffres, lits, portes…), **Outils & combat**,
+  **Nourriture** — l'onglet actif est surligné en blanc.
+- **Barre de recherche** : tape « pioche », « blé », « porte »… les objets sont
+  filtrés **dans tout le jeu** (nom exact, insensible à la casse).
+- **Grille défilante** de tous les objets (56 items), infobulles des noms au survol.
+- **Clic gauche** : pile complète sur le curseur (re-clic sur le même objet :
+  la pile disparaît, comme MC) · **Clic droit** : 1 seul objet ·
+  dépose dans la **barre rapide** en bas (clic gauche/gauche/droit standard).
+- **Slot **✕** rouge** en bas à droite : détruit la pile tenue.
+- Coffres, fours et établis s'ouvrent toujours sur l'interface classique,
+  même en créatif.
+
 ## Menu pause (Échap)
 
 Façon Minecraft 1.14 : le monde reste visible derrière un voile sombre.
@@ -216,7 +232,7 @@ a été recréé de zéro pixel par pixel en reprenant les codes visuels emblém
 ## Vérification
 
 Suite de tests sans navigateur : `node /tmp/smoke.js` (harnais VM Node) —
-120 contrôles : moteur, grottes, 6 biomes, craft, minage/délais, drops, faim/regen,
+135 contrôles : moteur, grottes, 6 biomes, craft, minage/délais, drops, faim/regen,
 explosions, squelettes/flèches, XP, sable, jour/nuit, mobs, particules,
 sortie d'eau, lit/dormir, armure, coffres persistants, villages,
 four (fabrication, fusion, jauges), infobulle des noms, arc (tir, dégâts,
@@ -229,7 +245,10 @@ aggro en mélée/flèche → téléportation),
 **wave 7 : recettes pain/échelle/grès/arc-au-fil, agriculture complète
 (labour → semis → croissance → récolte), descente sur échelle, araignée
 (spawn + modèle), slime et scission en 2 petits, météo (transition pluie/neige
-+ brouillard), préremplissage créatif à 36 emplacements**.
++ brouillard), préremplissage créatif à 36 emplacements,
+**wave 8 : inventaire créatif façon MC 1.14 (onglets à 6 catégories,
+barre de recherche, grille défilante 56 objets, X détruire, barre rapide
+intégrée)**.
 
 - **v9c** : atlas de textures passé en **64×64 par tuile** et skins des mobs en **32×32** :
   chaque motif reste peint à la main, agrandi proprement ×4 avec un grain fin par pixel
@@ -241,3 +260,6 @@ aggro en mélée/flèche → téléportation),
   amas) ; **tuiles nouvelles** : terre labourée, 3 stades de blé, grès à
   strates, écorce/anneaux de bouleau, échelle, graines, gerbe de blé, pain,
   houes, boule de slime, fil, seau plein — toutes peintes pixel par pixel.
+- **v11 (wave 8)** : **inventaire créatif refait comme le vrai Minecraft** :
+  onglets thématiques, recherche instantanée, pile complète au clic,
+  slot de destruction, barre rapide intégrée.

@@ -45,6 +45,113 @@
     126: { name: "Seau d'eau", tile: 69, maxStack: 1 }
   };
 
+  // ==================== INVENTAIRE CREATIF (facon MC 1.14) ====================
+  const CREATIVE_BLOCKS = [GRASS, DIRT, STONE, SAND, LOG, LEAVES, PLANKS, COBBLE,
+    GLASS, BRICK, BEDROCK, SNOW, GRAVEL, WOOL, COAL_ORE, IRON_ORE, TABLE, TORCH,
+    FLOWER_RED, FLOWER_YELLOW, TALLGRASS, BED, CHEST, FURNACE, DOOR_L, SIGN,
+    FARMLAND, SANDSTONE, LADDER];
+  const CREATIVE_ITEMS = [];
+  for (let i = 100; i <= 126; i++) CREATIVE_ITEMS.push(i);
+  const CREATIVE_ALL = CREATIVE_BLOCKS.concat(CREATIVE_ITEMS);
+  const CREATIVE_TABS = [
+    { key: 'all', label: 'Tout', ids: null },
+    { key: 'build', label: 'Blocs & construction',
+      ids: [PLANKS, LOG, BIRCH_LOG, STONE, COBBLE, SANDSTONE, BRICK, GLASS, BEDROCK] },
+    { key: 'nature', label: 'Nature',
+      ids: [GRASS, DIRT, SAND, GRAVEL, SNOW, LOG, BIRCH_LOG, LEAVES, FLOWER_RED, FLOWER_YELLOW, TALLGRASS, FARMLAND] },
+    { key: 'func', label: 'Fonctionnel',
+      ids: [TORCH, TABLE, FURNACE, CHEST, BED, DOOR_L, SIGN, LADDER, WOOL] },
+    { key: 'tools', label: 'Outils & combat',
+      ids: [102, 106, 107, 108, 122, 123, 109, 113, 112, 116, 126] },
+    { key: 'food', label: 'Nourriture',
+      ids: [103, 104, 110, 111, 114, 115, 121, 118, 117, 124, 125] }
+  ];
+  let cTab = 'all', cSearch = '';
+  const cBarEls = [], cTabBtns = [];
+  function creativeSearch(q, tab) {
+    let ids = (!tab || tab === 'all') ? CREATIVE_ALL.slice()
+      : ((CREATIVE_TABS.find((t) => t.key === tab) || { ids: [] }).ids.slice());
+    const s = String(q || '').trim().toLowerCase();
+    if (s) ids = ids.filter((id) => nameFor(id).toLowerCase().includes(s));
+    return ids.map((id) => nameFor(id));
+  }
+  function creativeSlotClick(id, button) {
+    const ms = maxStack(id);
+    if (button === 2) {
+      if (cursorStack && cursorStack.id === id) cursorStack.count = Math.min(ms, cursorStack.count + 1);
+      else cursorStack = { id, count: 1 };
+    } else {
+      if (cursorStack && cursorStack.id === id && cursorStack.count === ms) cursorStack = null;
+      else cursorStack = { id, count: ms };
+    }
+    renderCursorStack();
+    for (let i = 0; i < 9; i++) renderSlotContent(cBarEls[i], inv[i]);
+    updateHotbarUI();
+  }
+  function renderCreative() {
+    for (const t of cTabBtns) t.btn.classList.toggle('selected', t.key === cTab);
+    const q = (cSearch || '').trim().toLowerCase();
+    let ids = cTab === 'all' ? CREATIVE_ALL.slice() : ((CREATIVE_TABS.find((t) => t.key === cTab) || { ids: [] }).ids.slice());
+    if (q) {
+      const pool = cTab === 'all' ? ids : CREATIVE_ALL;
+      ids = pool.filter((id) => nameFor(id).toLowerCase().includes(q));
+    }
+    cGridEl.innerHTML = '';
+    for (const id of ids) {
+      const el = document.createElement('div');
+      el.className = 'slot';
+      renderSlotContent(el, { id, count: 1 });
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        creativeSlotClick(id, e.button);
+      });
+      cGridEl.appendChild(el);
+    }
+    for (let i = 0; i < 9; i++) renderSlotContent(cBarEls[i], inv[i]);
+    renderCursorStack();
+  }
+  function buildCreativeDom() {
+    for (const tb of CREATIVE_TABS) {
+      const b = document.createElement('button');
+      b.className = 'ctab';
+      b.textContent = tb.label;
+      b.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        cTab = tb.key;
+        renderCreative();
+      });
+      cTabsEl.appendChild(b);
+      cTabBtns.push({ btn: b, key: tb.key });
+    }
+    cSearchEl.addEventListener('input', () => {
+      cSearch = cSearchEl.value || '';
+      renderCreative();
+    });
+    for (let i = 0; i < 9; i++) cBarEls.push(makeInvSlot(cBarEl, inv, i));
+    cDestroyEl.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      cursorStack = null;
+      renderCursorStack();
+    });
+  }
+  function openCreative() {
+    invOpen = true;
+    invTitleEl.textContent = 'Inventaire créatif';
+    survivalPanelEl.classList.add('hidden');
+    creativePanelEl.classList.remove('hidden');
+    cSearchEl.value = '';
+    cSearch = '';
+    cTab = 'all';
+    renderCreative();
+    invEl.classList.remove('hidden');
+    keys.clear();
+    if (document.pointerLockElement === canvas) document.exitPointerLock();
+  }
+  function hideCreativePanel() {
+    creativePanelEl.classList.add('hidden');
+    survivalPanelEl.classList.remove('hidden');
+  }
+
   function trimShape(shape) {
     const rows = shape.map((r) => r.slice());
     while (rows.length && rows[0].every((c) => !c)) rows.shift();
@@ -131,6 +238,13 @@
   const armorIndEl = document.getElementById('armor-ind');
   const chestRowEl = document.getElementById('inv-chest-row');
   const furnaceRowEl = document.getElementById('furnace-row');
+  const survivalPanelEl = document.getElementById('survival-panel');
+  const creativePanelEl = document.getElementById('creative-panel');
+  const cTabsEl = document.getElementById('ctabs');
+  const cSearchEl = document.getElementById('csearch');
+  const cGridEl = document.getElementById('cgrid');
+  const cBarEl = document.getElementById('cbar');
+  const cDestroyEl = document.getElementById('cdestroy');
   let furnProgFillEl = null, furnBurnFillEl = null, furnFlameEl = null;
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
@@ -1969,6 +2083,7 @@
     if (!chestData.has(k)) chestData.set(k, new Array(27).fill(null));
     openChestArr = chestData.get(k);
     invOpen = true;
+    hideCreativePanel();
     invTitleEl.textContent = 'Coffre';
     craftGridEl.classList.add('hidden');
     resultSlotEl.classList.add('hidden');
@@ -1987,6 +2102,7 @@
     openFurnaceKey = k;
     openChestArr = null;
     invOpen = true;
+    hideCreativePanel();
     invTitleEl.textContent = 'Four';
     craftGridEl.classList.add('hidden');
     resultSlotEl.classList.add('hidden');
@@ -3135,6 +3251,7 @@
   function openInventory(size) {
     craftSize = size || 2;
     openChestArr = null;
+    hideCreativePanel();
     craftGridEl.classList.remove('hidden');
     resultSlotEl.classList.remove('hidden');
     invOpen = true;
@@ -3166,6 +3283,7 @@
     if (furnaceRowEl) { furnaceRowEl.classList.add('hidden'); furnaceRowEl.innerHTML = ''; }
     craftGridEl.classList.remove('hidden');
     resultSlotEl.classList.remove('hidden');
+    hideCreativePanel();
     invEl.classList.add('hidden');
     renderCursorStack();
     updateHotbarUI();
@@ -3185,6 +3303,7 @@
 
   function updateHotbarUI() {
     for (let i = 0; i < 9; i++) renderSlotContent(hotbarSlotEls[i], inv[i]);
+    for (let i = 0; i < 9; i++) if (cBarEls[i]) renderSlotContent(cBarEls[i], inv[i]);
   }
 
   function selectSlot(i) {
@@ -3700,6 +3819,7 @@
       e.preventDefault();
       if (player.dead) return;
       if (invOpen) closeInventory();
+      else if (gameMode === 'creative') openCreative();
       else openInventory(2);
       return;
     }
@@ -4029,6 +4149,7 @@
   document.getElementById('splash').textContent = SPLASHES[Math.floor(Math.random() * SPLASHES.length)];
   setDirtBackground();
   buildHotbar();
+  buildCreativeDom();
   buildInventoryDom();
   updateHealthUI();
   applyRenderDistance();
@@ -4466,6 +4587,8 @@
     toggleDoorAt, doorOpen, signData, openSignEdit, closeSignEdit, throwEgg,
     toggleMusic,
     tickWheat, wheatGrow, updateWeather, get weather() { return weather; },
+    openCreative, creativeSearch, creativeSlotClick,
+    get cursor() { return cursorStack; },
     updateMinimap, MINI_COLORS,
     get musicOn() { return musicOn; },
     netStart: (r) => startNet(r), netEnd, netOutBlock, currentNetRole, netState,

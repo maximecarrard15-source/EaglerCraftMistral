@@ -119,7 +119,7 @@
 </div>
 
 <div id="inventory" class="overlay hidden">
-  <div class="panel inv-panel">
+  <div class="panel inv-panel" id="survival-panel">
     <h2 id="inv-title">Inventaire</h2>
     <div id="craft-area">
       <div id="craft-grid"></div>
@@ -131,6 +131,17 @@
     <div id="inv-main"></div>
     <div id="inv-hotbar-row"></div>
     <p class="inv-hint">Clic gauche : prendre/poser · Clic droit : moitié / 1 par 1 · E ou Échap pour fermer</p>
+  </div>
+  <div class="panel inv-panel hidden" id="creative-panel">
+    <h2>Inventaire créatif</h2>
+    <div id="ctabs"></div>
+    <input id="csearch" type="text" placeholder="Rechercher…" autocomplete="off" />
+    <div id="cgrid"></div>
+    <div id="cfooter">
+      <div id="cbar"></div>
+      <div id="cdestroy" class="slot destroy" title="Détruire">&#10006;</div>
+    </div>
+    <p class="inv-hint">Clic gauche : pile complète sur le curseur · Clic droit : 1 seul · dépose dans la barre rapide · ✖ détruit · E pour fermer</p>
   </div>
 </div>
 
